@@ -40,13 +40,13 @@ class ValidationReadinessTests(unittest.TestCase):
 
     def test_unsupported_payload_warnings_exposed(self):
         raw = message_records()
-        unsupported = [('/robot1/laser/scan', 'sensor_msgs/msg/LaserScan', 1791633600000000000, b'not-a-cdr')]
+        unsupported = [('/robot1/laser/scan', 'sensor_msgs/msg/PointCloud2', 1791633600000000000, b'not-a-cdr')]
         with TemporaryDirectory() as t:
             p = Path(t)/'mixed.mcap'
             with patch('robot_incident_analyzer.fixture_v2.message_records', return_value=raw+unsupported):
                 make_mcap(p)
             events, stat, warnings, files, details = collect_inputs([p], with_details=True)
-            self.assertTrue(any('NOT inspected' in w and 'LaserScan' in w for w in warnings))
+            self.assertTrue(any('NOT inspected' in w and 'PointCloud2' in w for w in warnings))
             self.assertTrue(any(s.topic == '/robot1/laser/scan' for s in stat))
 
     def test_ambiguous_topic_selection_does_not_compare(self):

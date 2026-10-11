@@ -72,7 +72,7 @@ def decode_standard(msgtype: str, payload: bytes) -> Any:
     supported = (
         'geometry_msgs/Twist', 'geometry_msgs/TwistStamped', 'nav_msgs/Odometry',
         'tf2_msgs/TFMessage', 'diagnostic_msgs/DiagnosticArray',
-        'sensor_msgs/BatteryState', 'sensor_msgs/Imu',
+        'sensor_msgs/BatteryState', 'sensor_msgs/Imu', 'sensor_msgs/LaserScan',
     )
     if msgtype not in supported:
         return None
@@ -118,6 +118,33 @@ def decode_standard(msgtype: str, payload: bytes) -> Any:
                 'charge': charge, 'capacity': capacity, 'design_capacity': design_capacity,
                 'percentage': percentage, 'status': status, 'health': health,
                 'technology': technology, 'present': present}
+    if msgtype == 'sensor_msgs/LaserScan':
+        # ROS2 LaserScan: seven f32 metadata fields, then two f32 sequences.
+        # Scan beams are counted, not retained, to bound per-message memory.
+        _, frame = c.header()
+        (angle_min, angle_max, angle_inc, time_inc, scan_time,
+         range_min, range_max) = (c.read('f', 4) for _ in range(7))
+        n = c.sequence_count(250_000)
+        c.pos += (-(c.pos - 4)) % 4
+        if c.pos + n * 4 > len(c.data):
+            raise ValueError('Truncated LaserScan ranges')
+        beams = memoryview(c.data)[c.pos:c.pos + n * 4]
+        nan_count = 0
+        valid_count = 0
+        # +inf is a common ROS laser 'no return' sentinel, NOT a failed sensor.
+        # Finite readings outside [range_min,range_max] are discarded by consumers.
+        for (distance,) in struct.iter_unpack(c.endian + 'f', beams):
+            nan_count += math.isnan(distance)
+            if math.isfinite(distance) and range_min <= distance <= range_max:
+                valid_count += 1
+        c.pos += n * 4
+        intensity_count = c.sequence_count(250_000)
+        c.skip(intensity_count * 4, 4)
+        return {'frame': frame, 'angle_min': angle_min, 'angle_max': angle_max,
+                'angle_increment': angle_inc, 'time_increment': time_inc,
+                'scan_time': scan_time, 'range_min': range_min, 'range_max': range_max,
+                'beam_count': n, 'valid_returns': valid_count,
+                'nan_count': nan_count, 'intensity_count': intensity_count}
     if msgtype == 'sensor_msgs/Imu':
         c.header()
         orientation = c.quaternion()
@@ -188,6 +215,9 @@ class TelemetryAnalyzer:
         self.last_battery_health = {}
         self.last_battery_low = {}
         self.last_imu_invalid = {}
+        self.last_scan_metadata_invalid = {}
+        self.nan_scan_streak = defaultdict(int)
+        self.scan_nan_alert_active = set()
         self.cmd_streams = defaultdict(list)
         self.odom_streams = defaultdict(list)
         self.topics = {}
@@ -207,7 +237,7 @@ class TelemetryAnalyzer:
         self.topics[topic] = msgtype
         standard = {'geometry_msgs/Twist', 'geometry_msgs/TwistStamped', 'nav_msgs/Odometry',
                     'tf2_msgs/TFMessage', 'diagnostic_msgs/DiagnosticArray',
-                    'sensor_msgs/BatteryState', 'sensor_msgs/Imu'}
+                    'sensor_msgs/BatteryState', 'sensor_msgs/Imu', 'sensor_msgs/LaserScan'}
         custom = canonical in self.custom_roles and canonical not in standard
         if canonical not in standard and not custom:
             self.unsupported.add(msgtype)
@@ -221,6 +251,31 @@ class TelemetryAnalyzer:
                 decoded = decode_standard(msgtype, data)
         except (ValueError, struct.error, OverflowError, RecursionError):
             self.decode_failures += 1
+            return
+        if canonical == 'sensor_msgs/LaserScan':
+            invalid_meta = (not all(math.isfinite(decoded[k]) for k in
+                             ('angle_min','angle_max','angle_increment','range_min','range_max')) or
+                            decoded['range_min'] < 0 or
+                            decoded['range_max'] <= decoded['range_min'] or
+                            (decoded['beam_count'] > 1 and decoded['angle_increment'] == 0) or
+                            decoded['intensity_count'] not in (0, decoded['beam_count']))
+            if invalid_meta and not self.last_scan_metadata_invalid.get(topic, False):
+                self.emit(ts, 'LASER_SCAN_METADATA_INVALID',
+                          f'{topic}: LaserScan metadata is inconsistent (range_min/max, angle_increment, '
+                          f'or intensity count). frame={decoded["frame"]!r}; beam_count={decoded["beam_count"]}. '
+                          'Publisher data needs manual review; no hardware failure has been verified.',
+                          topic, 'WARN')
+            self.last_scan_metadata_invalid[topic] = invalid_meta
+            all_nan = decoded['beam_count'] > 0 and decoded['nan_count'] == decoded['beam_count']
+            self.nan_scan_streak[topic] = self.nan_scan_streak[topic] + 1 if all_nan else 0
+            if not all_nan:
+                self.scan_nan_alert_active.discard(topic)
+            if self.nan_scan_streak[topic] >= 3 and topic not in self.scan_nan_alert_active:
+                self.emit(ts, 'LASER_SCAN_ALL_NAN',
+                          f'{topic}: three or more consecutive LaserScan messages contain only NaN ranges. '
+                          'This is a data-quality observation; inspect the publisher and scanner status.',
+                          topic, 'WARN')
+                self.scan_nan_alert_active.add(topic)
             return
         if canonical == 'sensor_msgs/BatteryState':
             # Only explicit standardized health codes signal an abnormal health

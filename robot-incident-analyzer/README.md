@@ -1,4 +1,4 @@
-# Robot Incident Analyzer — v0.4.4
+# Robot Incident Analyzer — v0.4.5
 
 **Offline ROS2 incident triage · MCAP/DB3 · standard and explicitly configured custom `.msg` schemas.**
 
@@ -15,6 +15,14 @@ python3 -m unittest discover -s tests -v
 ```
 
 Open `output/report.html` in a browser. Supported inputs: `.csv`, `.db3`, `.sqlite3` and `.mcap`, with the limitations listed below.
+
+## New in v0.4.5: LaserScan quality observations
+
+- `sensor_msgs/msg/LaserScan` XCDR1 decoding with bounded range/intensity counts.
+- Report inconsistent metadata and 3+ consecutive all-NaN scans as **data-quality observations**, not confirmed sensor failures.
+- ROS LaserScan `+inf` means no-return and is **not** automatically classified as an error.
+- Synthetic scale measurements and limitations: [docs/V045_VALIDATION_KR.md](docs/V045_VALIDATION_KR.md).
+- External alpha tester guide: [docs/ALPHA_PILOT_EN.md](docs/ALPHA_PILOT_EN.md).
 
 ## New in v0.4: custom ROS2 message analysis
 
@@ -103,7 +111,7 @@ The HTML report includes:
 
 ## Compatibility and limits
 
-- ROS2 standard supported CDR types include Twist, TwistStamped, Odometry, TFMessage, DiagnosticArray, BatteryState, Imu, and rcl_interfaces/Log.
+- ROS2 standard supported CDR types include Twist, TwistStamped, Odometry, TFMessage, DiagnosticArray, BatteryState, Imu, LaserScan, and rcl_interfaces/Log.
 - `.mcap` is readable natively for common `cdr` messages and uncompressed chunks. zstd/lz4 chunks require optional `zstandard`/`lz4` dependencies or compatible `rosbags` integration. ROS1 bags and encrypted DB3 are not supported.
 - Tests generate **fictional**, valid example DB3/MCAP message records. Recorded robot logs from real hardware are not used or included.
 - `rosbags`, `zstandard`, and `lz4` are optional, not bundled. Install separately when needed. This environment has not verified an installed `rosbags` custom-schema reader.
@@ -166,7 +174,7 @@ Details: [Overseas engineer field-pilot guide](docs/FIELD_PILOT_EN.md) and [한�
 - See `docs/EXTERNAL_RECORDING_ACCEPTANCE_KR.md` and `docs/EXTERNAL_RECORDING_ACCEPTANCE_EN.md`.
 
 
-## v0.4.4 — standard battery and IMU inspection
+## v0.4.5 — standard battery and IMU inspection
 
 - Bounded CDR decoding for `sensor_msgs/msg/BatteryState` and `sensor_msgs/msg/Imu`.
 - Explicit BMS health errors trigger `BATTERY_HEALTH_ABNORMAL`; low charge alone never triggers a fault.

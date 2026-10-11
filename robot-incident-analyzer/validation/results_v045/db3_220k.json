@@ -1,0 +1,18 @@
+{
+  "type": "synthetic load test (NOT real robot)",
+  "python": "3.13.5",
+  "platform": "linux",
+  "paired_samples": 110000,
+  "messages": 220000,
+  "db3_size_mb": 86.16,
+  "generation_seconds": 2.992,
+  "analysis_seconds": 2.681,
+  "peak_process_rss_mb": 305.2,
+  "events": 0,
+  "findings": 1,
+  "topics": 2,
+  "warnings": [
+    "Only first 200,000 messages processed; topic statistics are partial."
+  ],
+  "expected_control_anomalies": 0
+}

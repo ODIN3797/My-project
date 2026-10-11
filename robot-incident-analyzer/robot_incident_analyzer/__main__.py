@@ -77,6 +77,16 @@ def main(argv: list[str] | None = None) -> int:
     comparison.add_argument('--min-candidate-hz',type=float,default=10.)
     comparison.add_argument('--min-duration-s',type=float,default=3.)
     comparison.add_argument('--max-messages',type=int,default=2000000)
+    rate=sub.add_parser('inspect-rates',help='locate sustained message-rate episodes within a ROS2 bag')
+    rate.add_argument('bag',type=Path)
+    rate.add_argument('--output',type=Path,default=Path('rate_investigation'))
+    rate.add_argument('--reference',type=Path,help='operator-selected baseline bag, topic/type must match')
+    rate.add_argument('--expected-hz',type=float,help='operator-configured expected Hz for selected topics')
+    rate.add_argument('--topic',help='exact topic (default: cmd_vel-like commands only)')
+    rate.add_argument('--ratio-threshold',type=float,default=3.)
+    rate.add_argument('--min-consecutive',type=int,default=2)
+    rate.add_argument('--min-count',type=int,default=10)
+    rate.add_argument('--max-messages',type=int,default=2000000)
     gui=sub.add_parser('gui',help='local-only browser UI with drag-and-drop upload')
     gui.add_argument('--port',type=int,default=8765)
     gui.add_argument('--output',type=Path,default=Path('output_gui'))
@@ -125,6 +135,15 @@ def main(argv: list[str] | None = None) -> int:
             for c in report['candidate_cases']:
                 print(f"{c['candidate']['filename']}: {c['rate_increases']} topics increased, {c['rate_decreases']} topics decreased vs reference")
             print(f'HTML: {args.output / "comparison.html"}\nJSON: {args.output / "comparison.json"}')
+            return 0
+        if args.command=='inspect-rates':
+            from .rate_timeline import inspect_bag
+            result=inspect_bag(args.bag,args.output,reference=args.reference,
+                max_messages=args.max_messages,topic=args.topic,
+                expected_hz=args.expected_hz,ratio_threshold=args.ratio_threshold,
+                min_consecutive=args.min_consecutive,min_count=args.min_count)
+            print(f"Rate episodes: {result['episode_count']} from {len(result['topics'])} selected topics")
+            print(f'HTML: {args.output / "rate_timeline.html"}\nJSON: {args.output / "rate_timeline.json"}')
             return 0
         if args.command=='gui':
             from .gui import run_gui

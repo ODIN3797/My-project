@@ -1,4 +1,4 @@
-# Robot Incident Analyzer v0.5.0 — State/Sensor Correlation Workbench
+# Robot Incident Analyzer v0.5.2 — Rate Timeline & Incident Workbench
 
 **Offline ROS2 incident triage, synchronized evidence charts, source-scoped odometry position markers, and optional local PDF export.**
 
@@ -305,3 +305,17 @@ A real-data-discovered false semantic match (Vigo GPS velocity estimate automati
 - [12-bag Korean technical report](docs/PUBLIC_12_BAG_REPORT_KR.md)
 - [Offline validation dashboard](validation/public_12bag_evidence/DASHBOARD_12_BAGS.html)
 - [Reproducible multi-dataset GitHub Actions workflow](.github/workflows/robot-incident-multibag-validation.yml)
+
+## v0.5.2 — Inspect single-bag topic-rate episodes
+
+The new offline `inspect-rates` CLI locates **when** ROS2 recorded message counts jump above a declared reference frequency (or above a stable earlier segment within the same recording). It produces `rate_timeline.html` with orange-highlighted 1-second windows and `rate_timeline.json` with original recorded timestamps and baseline provenance.
+
+```bash
+python3 -m robot_incident_analyzer inspect-rates suspect.db3 \
+  --reference normal.db3 \
+  --topic /mobile_base_controller/cmd_vel \
+  --ratio-threshold 3 --min-consecutive 2 --output rate_report
+xdg-open rate_report/rate_timeline.html
+```
+
+See [v0.5.2 release notes](RELEASE_NOTES_V052.md). **Message rate changes are not proof of attack or hardware fault.** No global safe Hz is assumed. Use a verified reference (same task/robot, matching topic and message type) or an explicitly configured expected Hz. A bag that is high-rate throughout cannot be assessed from its own history alone.

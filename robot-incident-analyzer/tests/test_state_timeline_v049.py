@@ -86,7 +86,7 @@ class StateTimelineTests(unittest.TestCase):
             out=Path(d)/'out'
             self.assertEqual(main(['analyze',str(path),'--output',str(out)]),0)
             j=json.loads((out/'report.json').read_text())
-            self.assertEqual(j['version'],'0.5.1')
+            self.assertEqual(j['version'],'0.5.2')
             self.assertIn('charging_state', {c['field'] for c in j['state_transitions']})
             self.assertEqual(len([x for x in j['state_transitions'] if x['robot_id']=='robot_b']),2)
             html=(out/'report.html').read_text()

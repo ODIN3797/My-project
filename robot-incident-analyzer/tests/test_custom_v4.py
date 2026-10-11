@@ -57,7 +57,7 @@ class CustomMessageV4Tests(unittest.TestCase):
                 self.assertIn('class="focus"',html)
                 self.assertIn('WARN / ERROR marker',html)
                 self.assertIn('Custom CDR messages decoded: 32',html)
-                self.assertEqual(json.loads((Path(tmp)/'output'/'report.json').read_text())['version'],'0.5.1')
+                self.assertEqual(json.loads((Path(tmp)/'output'/'report.json').read_text())['version'],'0.5.2')
 
     def test_missing_schema_and_invalid_paths_are_rejected(self):
         registry=SchemaRegistry()

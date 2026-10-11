@@ -66,7 +66,7 @@ class TelemetryV2Tests(unittest.TestCase):
             events,stats,warnings,files=self._analyze(path)
             save_report(root/'output',events,build_findings(events),stats,warnings,files)
             report=json.loads((root/'output'/'report.json').read_text())
-            self.assertEqual(report['version'],'0.5.1')
+            self.assertEqual(report['version'],'0.5.2')
             self.assertTrue(any(x['code']=='TF_MAP_ODOM_JUMP' for x in report['findings']))
             self.assertIn('CDR types decoded', (root/'output'/'report.html').read_text())
 

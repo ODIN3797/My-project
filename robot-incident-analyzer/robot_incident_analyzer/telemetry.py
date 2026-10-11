@@ -186,7 +186,7 @@ DEFAULT_THRESHOLDS = {
     'command_min_mps': 0.20, 'odom_stopped_max_mps': 0.03,
     'sync_tolerance_s': 0.35, 'mismatch_min_samples': 4,
     'mismatch_min_duration_s': 0.25, 'odom_jump_m': 1.0,
-    'odom_jump_window_s': 0.5, 'tf_jump_m': 1.0,
+    'odom_jump_window_s': 0.5, 'odom_speed_consistency_factor': 1.5, 'tf_jump_m': 1.0,
     'tf_jump_window_s': 1.0,
 }
 
@@ -323,13 +323,27 @@ class TelemetryAnalyzer:
                 self.emit(ts, 'ODOM_INVALID_QUATERNION', 'Odometry orientation has invalid quaternion norm.', topic)
             prev = self.last_odom.get(topic)
             if prev and decoded.get('position') is not None:
-                prev_ts,prev_pos=prev
+                prev_ts, prev_pos, prev_linear = prev
                 dt=ts-prev_ts
                 dist=math.dist(decoded['position'],prev_pos)
                 if 0 < dt <= self.thresholds['odom_jump_window_s'] and dist > self.thresholds['odom_jump_m']:
-                    self.emit(ts,'ODOM_POSITION_JUMP', f'{topic}: odometry position jumped {dist:.2f} m over {dt:.3f} s (record timestamps).',topic)
+                    # A purely absolute distance threshold mistakes legitimate
+                    # fast navigation (>2m/s for 1m/0.5s) for localization jumps.
+                    # Compare magnitudes (frame rotation does not change norm),
+                    # never x component alone, and allow sample/latching margin.
+                    # If twist is unavailable, retain the conservative alert.
+                    speeds=[]
+                    for vec in (prev_linear,decoded.get('linear')):
+                        if isinstance(vec,(tuple,list)) and len(vec)==3 and all(math.isfinite(v) for v in vec):
+                            speeds.append(math.sqrt(sum(v*v for v in vec)))
+                    consistent=bool(len(speeds)==2 and dist/dt <=
+                                    max(speeds)*self.thresholds['odom_speed_consistency_factor']+0.2)
+                    if not consistent:
+                        self.emit(ts,'ODOM_POSITION_JUMP',
+                          f'{topic}: position shift {dist:.2f} m / {dt:.3f} s exceeds distance threshold '
+                          'and is not corroborated by consecutive twist-speed magnitudes; examine frame, timestamps and localization.',topic)
             if decoded.get('position') is not None:
-                self.last_odom[topic]=(ts,decoded['position'])
+                self.last_odom[topic]=(ts,decoded['position'],decoded.get('linear'))
             return
         if canonical == 'tf2_msgs/TFMessage':
             for tf in decoded:

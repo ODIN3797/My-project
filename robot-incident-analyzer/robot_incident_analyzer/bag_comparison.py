@@ -104,13 +104,11 @@ def _summarize_records(records, path, file_first, file_last, reported_total, max
         s['count']+=1
         s['first_ns']=t if s['first_ns'] is None else min(t,s['first_ns'])
         s['last_ns']=t if s['last_ns'] is None else max(t,s['last_ns'])
-        # For typical runs (<1000s) record 1s bins keyed by topic-local start.
-        # Dynamic re-binning for long recordings would bias the comparison;
-        # instead store only first 1000 seconds of histogram and mark coverage.
-        bin_ix=(t - s['first_ns'])//NS
-        if 0<=bin_ix<MAX_BINS:
-            h=histogram[key]
-            h[int(bin_ix)]=h.get(int(bin_ix),0)+1
+        # Record absolute, epoch-aligned 1s bucket keys. Unlike a running
+        # topic-local origin this stays correct if MCAP messages are out of order.
+        bucket=t//NS
+        h=histogram[key]
+        h[bucket]=h.get(bucket,0)+1
     if reported_total is not None and count!=reported_total:
         raise ValueError(f'{path.name}: message count changed while recording was read')
     out=[]
@@ -118,17 +116,18 @@ def _summarize_records(records, path, file_first, file_last, reported_total, max
         c=s['count']; first=s['first_ns']; last=s['last_ns']
         span=(last-first)/NS if c>=2 else 0
         bins=histogram[(name,typ)]
-        complete=(span <= MAX_BINS-1)
-        if complete:
-            seq=[bins.get(i,0) for i in range(max(1,int(math.ceil(span))+1))]
-        else:
-            seq=[bins.get(i,0) for i in range(MAX_BINS)]
+        begin=first//NS
+        final=last//NS
+        window_count=final-begin+1
+        complete=window_count<=MAX_BINS
+        seq=[bins.get(begin+i,0) for i in range(min(MAX_BINS,window_count))]
         nz=[v for v in seq if v>0]
         out.append({'topic':name,'type':typ,'messages':c,'duration_s':round(span,4),
                     'mean_hz':round(_rate(c,first,last),4) if _rate(c,first,last) is not None else None,
                     'peak_1s_count':max(seq,default=0),
                     'median_active_1s_count':median(nz) if nz else 0,
-                    'sampled_window_s':min(MAX_BINS,max(1,int(math.ceil(span)))),
+                    'sampled_window_s':len(seq),'histogram_origin_ns':begin*NS,
+                    'epoch_aligned_bins':True,'first_ns':first,'last_ns':last,
                     'one_second_hist_complete':complete,
                     'one_second_counts':seq[:MAX_BINS]})
     return {'path':str(path),'filename':path.name,'format':path.suffix.lower().lstrip('.'),
@@ -179,7 +178,7 @@ def compare_summaries(baseline: dict, candidates: list[dict], ratio_threshold=3.
         cases.append({'candidate':candidate, 'topic_comparisons':rows,
                       'rate_increases':sum(x['status']=='RATE_INCREASE' for x in rows),
                       'rate_decreases':sum(x['status']=='RATE_DECREASE' for x in rows)})
-    return {'version':'0.5.1', 'reference':baseline, 'candidate_cases':cases,
+    return {'version':'0.5.2', 'reference':baseline, 'candidate_cases':cases,
             'criteria':{'ratio_threshold':ratio_threshold,'min_baseline_hz':min_baseline_hz,
                         'min_candidate_hz':min_candidate_hz,'min_duration_s':min_duration_s},
             'caveats':['Supplied baseline is operator-declared, not automatically known healthy.',

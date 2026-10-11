@@ -15,6 +15,7 @@ from urllib.request import urlopen, Request
 import zipfile
 
 from robot_incident_analyzer.bag_comparison import compare_bags, summarize_bag
+from robot_incident_analyzer.rate_timeline import inspect_bag
 
 ZENODO1='https://zenodo.org/records/17649537/files/Experiment_1.zip?download=1'
 VIGO='https://zenodo.org/records/15433859/files/Navigation.zip?download=1'
@@ -162,6 +163,25 @@ def run(output: Path, *, download=True, input_dir:Path|None=None):
                 if not ok: ledger['experiment1_rate_regression']['error']='Rate increase was not identified as expected'
             except Exception as exc:
                 ledger['experiment1_rate_regression']={'verified':False,'error':str(exc)[:350]}
+    if len(ex)>=2:
+        normal=next((p for p in ex if 'E1-1/' in p.as_posix()),None)
+        attack=next((p for p in ex if 'E1-2/' in p.as_posix()),None)
+        if normal and attack:
+            try:
+                case=inspect_bag(attack,output/'experiment1_rate_timeline',reference=normal,
+                                 topic='/mobile_base_controller/cmd_vel',min_consecutive=2)
+                control=inspect_bag(normal,output/'experiment1_control_rate_timeline',reference=normal,
+                                    topic='/mobile_base_controller/cmd_vel',min_consecutive=2)
+                ok=(case['episode_count']>=1 and control['episode_count']==0)
+                ledger['experiment1_local_episode_regression']={
+                    'verified':ok,'positive_episodes':case['episode_count'],
+                    'negative_control_episodes':control['episode_count'],
+                    'episodes':case['topics'][0]['episodes'][:10],
+                    'note':'Observed recorded arrival-density windows; no external onset-time truth labels.'}
+                print('experiment1: single-recording rate episodes',case['episode_count'],
+                      'negative-control episodes',control['episode_count'])
+            except Exception as exc:
+                ledger['experiment1_local_episode_regression']={'verified':False,'error':str(exc)[:500]}
     if len(vi)>=2:
         try:
             cmp=compare_bags(vi[0],vi[1:13],output/'vigo_multi_comparison')
@@ -170,6 +190,23 @@ def run(output: Path, *, download=True, input_dir:Path|None=None):
                  'note':'Different driving configurations; rate differences do not imply defects'}
         except Exception as exc:
             ledger['vigo_reference_analysis']={'error':str(exc)[:350]}
+    # Independent navigation recordings are *not* confirmed healthy. This
+    # rate-control pass measures only alerts against another recorded run;
+    # each result must be reviewed before it can be called a false alarm.
+    if len(vi)>1:
+        cases=[]
+        for p in vi[1:]:
+            try:
+                r=inspect_bag(p,output/'vigo_rate_episodes'/p.stem,
+                    reference=vi[0],topic=None)
+                cases.append({'name':p.name,'episode_count':r['episode_count'],
+                    'selected_topics':len(r['topics']),
+                    'status':'UNADJUDICATED'})
+            except Exception as exc:
+                cases.append({'name':p.name,'error':str(exc)[:300]})
+        ledger['vigo_local_rate_review']={'cases':cases,
+            'total_episodes':sum(c.get('episode_count',0) for c in cases),
+            'note':'Not a labeled negative-control experiment; configuration differences may alter rates.'}
     ledger['total_bags_downloaded']=len(ex)+len(vi)+len(bg)
     ledger['successfully_summarized']=sum(sum('error' not in c for c in v.get('bag_summaries',[])) for v in ledger['recording_sources'].values())
     ledger['status']='COMPLETE_WITH_LIMITATIONS' if ledger['total_bags_downloaded'] else 'NO_BAGS_DOWNLOADED'
@@ -187,6 +224,8 @@ def run(output: Path, *, download=True, input_dir:Path|None=None):
         msg.append('')
     msg+=['## Independent normal-vs-simulated-attack acceptance','',json.dumps(ledger.get('experiment1_rate_regression',{'status':'NOT_TESTED'}),ensure_ascii=False,indent=2),'',
           '## Vigo relative comparison','',json.dumps(ledger.get('vigo_reference_analysis',{'status':'NOT_TESTED'}),ensure_ascii=False,indent=2),
+          '', '## Time-localized command-rate episode check','',json.dumps(ledger.get('experiment1_local_episode_regression',{'status':'NOT_TESTED'}),ensure_ascii=False,indent=2),
+          '', '## Vigo rate-episode review','',json.dumps(ledger.get('vigo_local_rate_review',{'status':'NOT_TESTED'}),ensure_ascii=False,indent=2),
           '', '## Caveats', '', '- Recorded topic message rates are not publisher-set rates or verified robot control updates.',
           '- A normal publisher label does not make every individual observation normal; manually review normal-case warnings.',
           '- Different vehicle speeds, RTK configurations, and robots can legitimately have different sample rates.',
@@ -207,6 +246,7 @@ if __name__=='__main__':
     # Exit 0 only when the independent normal-vs-attack case is truly verified,
     # Vigo multi-run dataset downloaded, and BAGEL MCAP was interpreted.
     good=(r.get('experiment1_rate_regression',{}).get('verified') is True and
+          r.get('experiment1_local_episode_regression',{}).get('verified') is True and
           r.get('vigo_reference_analysis',{}).get('compared',0)>=2 and
           r.get('vigo_command_semantic_safety',{}).get('passed') is True and
           r.get('recording_sources',{}).get('bagel_example',{}).get('single_analysis_return_code') in (0,3))

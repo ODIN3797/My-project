@@ -295,3 +295,13 @@ xdg-open comparison_output/comparison.html
 ```
 
 The reference is **user-supplied, not independently certified healthy**. No universal rate alarm is emitted without a reference. Differences in task duration or configuration can explain rate changes. [Full guide](docs/MULTI_BAG_V051_EN.md).
+
+### Independent external ROS2 bag benchmark (2026-10-11)
+
+The v0.5.1 benchmark has **actually analyzed 12 published ROS2 recordings from three separate sources**: the Zenodo mobile robot normal-vs-simulated-DoS experiment (2 SQLite recordings), nine physical navigation runs from the University of Vigo RPSC dataset, and the public BAGEL example MCAP. The new `compare-bags` command surfaced the **8.32× measured downstream command topic-rate increase** in the attack run that previous single-bag rules had missed.
+
+A real-data-discovered false semantic match (Vigo GPS velocity estimate automatically interpreted as a motor command) was **fixed** and retested on the Vigo recordings. No independent real-hardware fault ground truth, diagnostic precision/recall, commercial usage, or reduction in engineering time has yet been demonstrated. Original bag files are not redistributed.
+
+- [12-bag Korean technical report](docs/PUBLIC_12_BAG_REPORT_KR.md)
+- [Offline validation dashboard](validation/public_12bag_evidence/DASHBOARD_12_BAGS.html)
+- [Reproducible multi-dataset GitHub Actions workflow](.github/workflows/robot-incident-multibag-validation.yml)

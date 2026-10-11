@@ -283,3 +283,15 @@ python3 -m robot_incident_analyzer analyze state_demo/fictional_state_transition
 ```
 
 Pass `--config examples/state_config.json` for custom explicit state keys, e.g. `lift_state`. This is a **log-text state observation**, not verification of controller state. See `docs/STATE_TIMELINE_V049_EN.md` and `RELEASE_NOTES_V049.md`.
+
+## v0.5.1: compare independent ROS2 bag recordings
+
+Use recorded reference/candidate topic rates to investigate changes in ROS2 message cadence without declaring a cause:
+
+```bash
+python3 -m robot_incident_analyzer compare-bags normal.db3 suspected.db3 \
+  --output comparison_output --ratio-threshold 3
+xdg-open comparison_output/comparison.html
+```
+
+The reference is **user-supplied, not independently certified healthy**. No universal rate alarm is emitted without a reference. Differences in task duration or configuration can explain rate changes. [Full guide](docs/MULTI_BAG_V051_EN.md).

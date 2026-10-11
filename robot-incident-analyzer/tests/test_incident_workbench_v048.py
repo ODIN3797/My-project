@@ -93,7 +93,7 @@ class IncidentWorkbenchTests(unittest.TestCase):
             self.assertIn('incident-workbench',h)
             self.assertTrue((output/'report.pdf').read_bytes().startswith(b'%PDF-'))
             self.assertGreater((output/'report.pdf').stat().st_size,5000)
-            self.assertEqual(json.loads((output/'report.json').read_text())['version'],'0.5.0')
+            self.assertEqual(json.loads((output/'report.json').read_text())['version'],'0.5.1')
 
     def test_optional_pdf_dependency_is_explained(self):
         from robot_incident_analyzer.pdf_export import export_pdf

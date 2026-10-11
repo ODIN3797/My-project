@@ -68,6 +68,15 @@ def main(argv: list[str] | None = None) -> int:
     field.add_argument('--labels', type=Path, help='optional human-authored CSV expected incidents')
     field.add_argument('--origin', choices=['unknown', 'physical', 'simulation', 'synthetic'], default='unknown')
     field.add_argument('--max-messages', type=int, default=200000)
+    comparison=sub.add_parser('compare-bags',help='reference-relative ROS2 bag topic rates and rate spikes')
+    comparison.add_argument('baseline',type=Path,help='operator-selected reference recording (not guaranteed healthy)')
+    comparison.add_argument('candidates',nargs='+',type=Path,help='one or more comparison bag files')
+    comparison.add_argument('--output',type=Path,default=Path('comparison_output'))
+    comparison.add_argument('--ratio-threshold',type=float,default=3.)
+    comparison.add_argument('--min-baseline-hz',type=float,default=2.)
+    comparison.add_argument('--min-candidate-hz',type=float,default=10.)
+    comparison.add_argument('--min-duration-s',type=float,default=3.)
+    comparison.add_argument('--max-messages',type=int,default=2000000)
     gui=sub.add_parser('gui',help='local-only browser UI with drag-and-drop upload')
     gui.add_argument('--port',type=int,default=8765)
     gui.add_argument('--output',type=Path,default=Path('output_gui'))
@@ -107,6 +116,16 @@ def main(argv: list[str] | None = None) -> int:
             for item in result['cases']:
                 print(f'{item["id"]}: {item["status"]}, {item["topic_count"]} topics, {item["event_count"]} events')
             return 3 if any(x['status']=='REVIEW_REQUIRED' for x in result['cases']) else 0
+        if args.command=='compare-bags':
+            from .bag_comparison import compare_bags
+            report=compare_bags(args.baseline,args.candidates,args.output,
+                ratio_threshold=args.ratio_threshold,min_baseline_hz=args.min_baseline_hz,
+                min_candidate_hz=args.min_candidate_hz,min_duration_s=args.min_duration_s,
+                max_messages=args.max_messages)
+            for c in report['candidate_cases']:
+                print(f"{c['candidate']['filename']}: {c['rate_increases']} topics increased, {c['rate_decreases']} topics decreased vs reference")
+            print(f'HTML: {args.output / "comparison.html"}\nJSON: {args.output / "comparison.json"}')
+            return 0
         if args.command=='gui':
             from .gui import run_gui
             if not (1<=args.port<=65535): raise ValueError('port must be between 1 and 65535')

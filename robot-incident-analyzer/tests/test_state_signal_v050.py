@@ -94,7 +94,7 @@ class StateSignalCompareTests(unittest.TestCase):
             out=Path(d)/'output'
             self.assertEqual(main(['analyze',str(bag),'--output',str(out)]),0)
             j=json.loads((out/'report.json').read_text())
-            self.assertEqual(j['version'],'0.5.0')
+            self.assertEqual(j['version'],'0.5.1')
             comparisons=j['state_sensor_comparisons']
             self.assertTrue(comparisons)
             self.assertTrue(any(c['transitions'] and any(tr['signals'] for tr in c['transitions']) for c in comparisons))

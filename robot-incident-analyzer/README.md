@@ -4,7 +4,7 @@
 
 Experimental MIT-licensed, Python 3.10+ tool for robotics engineers. It produces evidence-first HTML/JSON incident reports with topic discovery, velocity comparison, and timestamp-aligned anomaly markers. No cloud upload or AI API is required.
 
-> **Research prototype / not safety-critical.** Tests use synthetic ROS2 CDR bags only. It has NOT been validated on real robot fleet recordings or benchmarked for diagnosis precision. Rule-based alerts are observations and hypotheses, not confirmed root causes. Analyze only authorized data and authorized message schemas; respect employer/customer intellectual property and privacy restrictions.
+> **Research prototype / not safety-critical.** Automated test fixtures are synthetic. A public third-party MCAP sample has passed format-compatibility analysis, but it is NOT a confirmed physical robot field recording. The tool has NOT been validated on real robot fleet recordings or benchmarked for diagnosis precision. Rule-based alerts are observations and hypotheses, not confirmed root causes. Analyze only authorized data and authorized message schemas; respect employer/customer intellectual property and privacy restrictions.
 
 ## Quick start: built-in standard ROS2 messages
 
@@ -103,7 +103,7 @@ The HTML report includes:
 
 ## Compatibility and limits
 
-- ROS2 standard supported CDR types include Twist, TwistStamped, Odometry, TFMessage, DiagnosticArray, and rcl_interfaces/Log.
+- ROS2 standard supported CDR types include Twist, TwistStamped, Odometry, TFMessage, DiagnosticArray, BatteryState, Imu, and rcl_interfaces/Log.
 - `.mcap` is readable natively for common `cdr` messages and uncompressed chunks. zstd/lz4 chunks require optional `zstandard`/`lz4` dependencies or compatible `rosbags` integration. ROS1 bags and encrypted DB3 are not supported.
 - Tests generate **fictional**, valid example DB3/MCAP message records. Recorded robot logs from real hardware are not used or included.
 - `rosbags`, `zstandard`, and `lz4` are optional, not bundled. Install separately when needed. This environment has not verified an installed `rosbags` custom-schema reader.
@@ -156,11 +156,11 @@ python3 -m robot_incident_analyzer field-validate \
 Details: [Overseas engineer field-pilot guide](docs/FIELD_PILOT_EN.md) and [한국어 검증 보고](docs/FIELD_VALIDATION_KR.md). Never publish unredacted customer or employer logs.
 
 
-## v0.4.4 — external data readiness (2026-10-11)
+## v0.4.3 — external data readiness (2026-10-11)
 
 - Includes system `libzstd` fallback for native zstd-compressed MCAP chunks when Python `zstandard` is not installed (requires OS shared library; Windows/macOS users may still need the Python package).
 - Rejects corrupted MCAP chunk CRC and truncated/missing file trailer instead of silently reporting success.
-- Adds 5 independent synthetic MCAP structural/codec tests (51/51 tests pass in the recorded Linux environment).
+- Added 5 independent synthetic MCAP structural/codec tests (51/51 passed in the v0.4.3 Linux environment).
 - Provides `scripts/validate_local_real_bag.sh`, independent data acceptance checklists and reproducible execution guidance.
 - **Actual externally recorded physical robot bag tested: 0; overseas engineers who ran the tool: 0.** A source URL is not a successful dataset download. Do not claim field accuracy based on this release.
 - See `docs/EXTERNAL_RECORDING_ACCEPTANCE_KR.md` and `docs/EXTERNAL_RECORDING_ACCEPTANCE_EN.md`.
@@ -171,4 +171,5 @@ Details: [Overseas engineer field-pilot guide](docs/FIELD_PILOT_EN.md) and [한�
 - Bounded CDR decoding for `sensor_msgs/msg/BatteryState` and `sensor_msgs/msg/Imu`.
 - Explicit BMS health errors trigger `BATTERY_HEALTH_ABNORMAL`; low charge alone never triggers a fault.
 - The ROS2 `orientation_covariance[0] == -1` sentinel is honored; unavailable orientation is not flagged.
+- 61 automated tests pass locally, including seven new CDR, DB3/MCAP and defensive regression tests.
 - These heuristics still require review of the bag's provenance, message types and publisher behavior.

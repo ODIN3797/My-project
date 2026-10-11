@@ -1,41 +1,41 @@
-# Public BAGEL MCAP compatibility assessment
+# Public MCAP sample — v0.4.4 compatibility assessment
 
-**Status: format compatibility confirmed; diagnostic correctness NOT established.**
+**PASS: file parsing / report generation. NOT VERIFIED: physical robot provenance, incident correctness, or commercially useful diagnosis.**
 
-This is a third-party public MCAP sample, **not verified as a recording from a physical robot**. No independent fault ground truth or human validation is available for this sample.
+## Reproducible input
 
-## Provenance
-- Upstream repository: https://github.com/Hussain004/BAGEL
-- Pinned commit: `dc25e7ef395546bfbeea2ca07b71091fe70f5112`
+- Upstream public repo: https://github.com/Hussain004/BAGEL
+- Pinned revision: `dc25e7ef395546bfbeea2ca07b71091fe70f5112`
 - File: `public/sample-bags/tour.mcap`
 - Input SHA-256: `1ee3a7b89700b35036f7eba33a5f7225d6a98ac313b4b9d5c106a9ffe337d1e1`
+- Source origin: **unknown** (physical-world provenance not independently confirmed)
 
-## Observed results (GitHub Actions, Python 3.12)
+## GitHub Actions observations
 
-| Metric | Result |
-|---|---:|
-| Input size | 3,939,747 bytes |
-| Topics | 18 |
-| Messages | 3,057 |
-| WARN/ERROR events from `/rosout` | 4 |
-| Findings after recurrence fix | 1 (`OBSERVED_ERROR`) |
-| Overall status | `REVIEW_REQUIRED` |
+| Item | Result |
+|---|---|
+| File size | 3,939,747 bytes |
+| Topic names | 18 |
+| Recorded messages | 3,057 |
+| `/rosout` WARN/ERROR observations | 4 |
+| Findings | 1 × `OBSERVED_ERROR` (not a confirmed failure) |
+| Status | `REVIEW_REQUIRED` |
+| Unsupported payload message types | **12**, down from **14** in v0.4.3 |
+| Diagnostics requiring a command velocity source | Not evaluated — no compatible command topic |
+| Ground truth or human-annotated faults | None |
 
-The remaining finding refers to a `/rosout` ERROR message concerning a docking beacon and odometry fallback. **A logged ERROR does not establish an actual equipment failure.**
+v0.4.4 added `sensor_msgs/msg/BatteryState` and `sensor_msgs/msg/Imu` decoders. This **reduces the number of uninspected types**, but it does *not* establish incident recall or a measured improvement in debugging time. There were no new abnormal battery health or IMU quaternion events in the sample under the configured checks.
 
-The previous `RECURRING_ALERT` finding incorrectly grouped unrelated perception, battery and docking messages by the generic `ROS_LOG` code. We fixed this by grouping `ROS_LOG` messages using a normalized message signature, with numeric variation allowed, and added regression tests.
+In v0.4.3 we fixed a false repeated-alert issue by not grouping unrelated `/rosout` warning texts solely under generic `ROS_LOG`.
 
-## Coverage limitations
+## Remaining limitations
 
-- The recording has `/odom` but **no suitable command-velocity topic**, so the command-versus-odometry detector cannot be evaluated.
-- **14 unsupported message types** had no payload inspection, including image, laser scan, battery, mapping and path messages.
-- No ground-truth incident labels; precision, recall and false-positive rate **cannot be estimated**.
-- The upstream sample's origin is not independently confirmed as physical recording.
+- No truth labels: false-positive rate, precision and recall cannot be measured.
+- `LaserScan`, `PointCloud2`, image and mapping/navigation payloads are not interpreted yet (some can have recording-time topic-gap checks).
+- The observed log error is only proof a publisher logged an error, not that the hardware failed.
+- This public sample must not be referred to as a verified physical or deployed robot field recording.
+- 61 automated tests use **synthetic** data and validate software behavior rather than real-world diagnostic accuracy.
 
-## Reproduce
-Run the pinned public-sample workflow at `.github/workflows/robot-incident-public-mcap.yml`. The uploaded Action artifact contains the HTML/JSON report and field validation summary.
+## Reproduction
 
-## Follow-up
-1. Obtain independently verified, authorized physical ROS2 recordings and known incident labels.
-2. Compare detection findings with engineer-annotated event timelines.
-3. Add selective sensor diagnostics after measuring demand and memory/cost constraints.
+In the standalone GitHub repository, the file `.github/workflows/public-mcap.yml` downloads this pinned MCAP and generates an artifact with `field_results.json` and the HTML report.

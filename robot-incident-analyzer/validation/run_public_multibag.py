@@ -118,6 +118,30 @@ def run(output: Path, *, download=True, input_dir:Path|None=None):
                 if result.returncode not in (0,3):rec['single_analysis_error']=result.stdout[-700:]+result.stderr[-700:]
             except Exception as exc:
                 rec['single_analysis_error']=str(exc)[:350]
+    # Deep run: compare not only topic headers but event-based rule analysis for
+    # independent physical navigation recordings. Always label rule hits as
+    # unadjudicated candidates, not confirmed hardware defects.
+    for name, paths, origin in [('experiment1',ex,'unknown'),('vigo_navigation',vi,'physical')]:
+        if not paths:
+            continue
+        rec=ledger['recording_sources'][name]
+        try:
+            result=subprocess.run([sys.executable,'-m','robot_incident_analyzer','field-validate',
+                *[str(x) for x in paths[:12]], '--origin',origin,'--output',str(output/(name+'_field_reports')),
+                '--max-messages','200000'], timeout=150,capture_output=True,text=True)
+            rec['full_event_analysis_return_code']=result.returncode
+            if result.returncode in (0,3):
+                field=json.loads((output/(name+'_field_reports')/'field_results.json').read_text())
+                rec['deep_analysis']=[{'name':x['input_name'],'messages':x['message_count'],
+                    'topic_count':x['topic_count'],'event_count':x['event_count'],
+                    'finding_count':x['finding_count'], 'event_codes':x['event_codes'],
+                    'status':x['status'], 'review_flags':x['review_flags'],
+                    'warning_count':len(x.get('warnings',[]))} for x in field['cases']]
+                print(name,': full event analysis',len(rec['deep_analysis']), 'bag(s)')
+            else:
+                rec['full_analysis_error']=(result.stderr[-1500:]+' '+result.stdout[-1500:])[:2600]
+        except Exception as exc:
+            rec['full_analysis_error']=str(exc)[:500]
     if len(ex)>=2:
         normal=next((p for p in ex if 'E1-1/' in p.as_posix()),None)
         attack=next((p for p in ex if 'E1-2/' in p.as_posix()),None)

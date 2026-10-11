@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ROS2 Rate Label Review</title><style>
+:root{font:15px system-ui,sans-serif;color:#ebf2fa;background:#091625}main{max-width:1130px;margin:auto;padding:30px 18px}.card{background:#14273a;border:1px solid #38536b;border-radius:14px;padding:20px;margin:16px 0}h1{font-size:clamp(25px,4vw,40px)}.muted{color:#afc4d2}label{display:block;margin:10px 0}.small{font-size:12px}input[type=text]{background:#092135;border:1px solid #5b798a;color:white;padding:12px;border-radius:6px;width:min(430px,90%)}button{color:#eaf5ff;background:#1a4a60;border:1px solid #4d8497;border-radius:7px;padding:9px 14px;cursor:pointer}button:focus-visible{outline:3px solid #fff}button:hover{background:#256c78}button:disabled{opacity:.4;cursor:default}#bins{display:flex;align-items:flex-end;gap:2px;min-height:160px;overflow-x:auto;border-bottom:1px solid #4a6776;padding-top:8px}#bins button{padding:0;flex:1 0 6px;min-width:6px;border:0;border-radius:3px 3px 0 0;background:#52b9bb;position:relative}#bins button.selected{background:#fcbf72}#bins button.positive{background:#fa6f80}#bins button.negative{background:#83aee9}#bins button.predicted{box-shadow:inset 0 0 0 3px #fff}#bins button:focus-visible{outline:2px solid #ffec9a;z-index:1}.actions{display:flex;flex-wrap:wrap;gap:9px}.warning{padding:12px;border-left:3px solid #ffc26f;background:#372d29}code{overflow-wrap:anywhere}li{padding:5px}#status{min-height:20px;color:#ffd38e}</style></head><body><main>
+<p class="muted">ROBOT INCIDENT ANALYZER · OFFLINE ANNOTATION</p><h1>Review recorded ROS2 topic intervals</h1><p>Topic: <code>/robot/cmd_vel</code> · recording SHA-256 prefix <code>ee7f6fdb4b535a3a</code></p>
+<p class="warning"><strong>Unreviewed by default.</strong> Recorded message-rate bursts are not necessarily faults. Mark only intervals you have independently inspected. All times are Unix nanoseconds in the recording. Label decisions remain on this computer. Do not treat publisher scenario descriptions as precise onset labels.</p>
+<section class="card"><h2>1. Select interval boundaries</h2><p class="muted">Click one bar for the start, then another bar for the inclusive end. All available bars are complete one-second windows. Hover to see Unix nanoseconds and message count. Purple outline appears only if you reveal analyzer predictions.</p><div id="bins" role="group" aria-label="Per-second message counts"></div><p id="selection" class="muted">No interval selected</p><div class="actions"><button id="positive" type="button">Mark independently confirmed incident</button><button id="negative" type="button">Mark explicitly reviewed normal interval</button><button id="clear" type="button">Clear selection</button></div></section>
+<section class="card"><h2>2. Review annotations</h2><ul id="annotations"></ul><p id="status" role="status"></p><label><input id="reveal" type="checkbox"> Show analyzer predictions (hidden by default to reduce review bias)</label></section>
+<section class="card"><h2>3. Export annotation JSON</h2><label for="reviewer">Reviewer identifier (required for reviewed status)</label><input id="reviewer" type="text" maxlength="120" placeholder="e.g., engineer-01"><label><input id="confirm" type="checkbox"> I have reviewed and explicitly labelled all intervals entered above; the rest remains unreviewed.</label><div class="actions"><button id="export" type="button">Download annotation JSON</button></div><p class="muted small">The download is marked <strong>reviewed</strong> only when reviewer ID is provided, a labelled interval exists and this checkbox is checked. Otherwise it remains UNREVIEWED and cannot produce diagnostic metrics.</p></section>
+</main><script type="application/json" id="review-source">{"template": {"schema_version": "1.0", "recording_sha256": "ee7f6fdb4b535a3a60443ab9abdf44c11c6b4531a4090d7f2dbcca071f22d3f0", "topic": "/robot/cmd_vel", "message_type": "geometry_msgs/msg/Twist", "reviewer": "", "ground_truth_status": "unreviewed", "positive_intervals": [], "negative_intervals": [], "review_notes": "Template only: label exact start_ns/end_ns in Unix nanoseconds. Set ground_truth_status to reviewed ONLY after independent review; positives and explicitly checked negative intervals must not overlap. Unreviewed intervals are ignored, not counted as negatives."}, "origin": "1740000010000000000", "start_index": 1, "end_index_exclusive": 19, "counts": [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 165, 165, 165, 165, 165, 165, 20, 20, 20], "predictions": [{"start_ns": "1740000021000000000", "end_ns": "1740000027000000000", "start_s_from_topic": 11, "duration_s": 6, "messages_in_windows": 990, "max_messages_per_s": 165, "baseline_hz": 20.0, "peak_ratio": 8.25, "baseline_method": "reference bag recorded Hz", "evidence": "recorded message arrival times only; not fault or attack classification"}]}</script><script>
+'use strict';
+const data=JSON.parse(document.getElementById('review-source').textContent);
+const NS=1000000000n;
+const origin=BigInt(data.origin);
+const state={start:null,end:null,positives:[],negatives:[]};
+const bins=document.getElementById('bins'), selection=document.getElementById('selection'), status=document.getElementById('status');
+const startIndex=data.start_index, endIndex=data.end_index_exclusive;
+const windowStart=i => origin+BigInt(i)*NS;
+const ranges=(arr)=>arr.map(x=>({start_ns:x.start_ns,end_ns:x.end_ns}));
+function selectedInterval(){if(state.start===null||state.end===null)return null;let lo=Math.min(state.start,state.end),hi=Math.max(state.start,state.end);return {start_ns:windowStart(lo).toString(),end_ns:windowStart(hi+1).toString()};}
+function overlaps(a,b){return BigInt(a.start_ns)<BigInt(b.end_ns)&&BigInt(b.start_ns)<BigInt(a.end_ns);}
+function repaint(){let selected=selectedInterval();
+ document.querySelectorAll('#bins button').forEach((el)=>{let i=Number(el.dataset.bin),s=windowStart(i),e=s+NS;el.className='';
+  let current={start_ns:s.toString(),end_ns:e.toString()};
+  if(state.negatives.some(n=>overlaps(n,current))) el.classList.add('negative');
+  if(state.positives.some(n=>overlaps(n,current))) el.classList.add('positive');
+  if(selected&&overlaps(selected,current))el.classList.add('selected');
+  if(document.getElementById('reveal').checked&&data.predictions.some(n=>overlaps(n,current)))el.classList.add('predicted');
+ });
+ selection.textContent=selected?('Selected: '+selected.start_ns+' → '+selected.end_ns+' (Unix ns)'):'No interval selected';
+ const rows=document.getElementById('annotations');rows.replaceChildren();
+ for(const [kind,list] of [['positive',state.positives],['negative',state.negatives]]){
+  list.forEach((a,i)=>{let li=document.createElement('li');li.textContent=kind.toUpperCase()+': '+a.start_ns+' → '+a.end_ns+' ';let b=document.createElement('button');b.type='button';b.textContent='Remove';b.onclick=()=>{list.splice(i,1);repaint()};li.appendChild(b);rows.appendChild(li)})
+ }
+}
+let counts=data.counts.slice(startIndex,endIndex), maxCount=Math.max(1,...counts);
+for(let i=startIndex;i<endIndex;i++){
+ let el=document.createElement('button');el.type='button';el.dataset.bin=String(i);el.style.height=(16+110*data.counts[i]/maxCount).toFixed(1)+'px';
+ el.title=`Bin ${i}: ${data.counts[i]} messages, ${windowStart(i)}–${windowStart(i+1)} ns`;
+ el.setAttribute('aria-label',el.title);
+ el.onclick=()=>{if(state.start===null||state.end!==null){state.start=i;state.end=null}else{state.end=i}repaint()};
+ bins.appendChild(el)
+}
+function mark(which){const a=selectedInterval();if(!a){status.textContent='Select two bin boundaries first';return}
+ if([...state.positives,...state.negatives].some(x=>overlaps(x,a))){status.textContent='Annotation overlap: remove the existing interval first';return}
+ (which==='positive'?state.positives:state.negatives).push(a);state.start=null;state.end=null;status.textContent='Interval labelled. Review the remainder independently.';repaint()}
+document.getElementById('positive').onclick=()=>mark('positive');document.getElementById('negative').onclick=()=>mark('negative');document.getElementById('clear').onclick=()=>{state.start=null;state.end=null;repaint()};document.getElementById('reveal').onchange=repaint;
+document.getElementById('export').onclick=()=>{
+ const reviewer=document.getElementById('reviewer').value.trim();const confirmation=document.getElementById('confirm').checked;
+ const ready=Boolean(reviewer&&confirmation&&(state.positives.length+state.negatives.length));
+ // Unix ns exceeds JS integer safe range: replace numeric encoding as raw integer tokens,
+ // rather than losing nanosecond precision through JSON.stringify floating-point conversion.
+ // Export exact timestamps without converting any numbers through JS floating point.
+ // The regex below handles multiple identical labels; output carries explicit exact integer literals.
+ let exact=JSON.stringify({...data.template,reviewer,ground_truth_status:ready?'reviewed':'unreviewed',positive_intervals:[],negative_intervals:[]},null,2);
+ const toExact=x=>'{"start_ns": '+x.start_ns+', "end_ns": '+x.end_ns+'}';
+ exact=exact.replace('"positive_intervals": []','"positive_intervals": ['+state.positives.map(toExact).join(', ')+']');
+ exact=exact.replace('"negative_intervals": []','"negative_intervals": ['+state.negatives.map(toExact).join(', ')+']');
+ const blob=new Blob([exact+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='rate_annotations.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ status.textContent=ready?'Exported REVIEWED labels. All unlabelled periods remain unknown.':'Exported UNREVIEWED draft. Reviewer, acknowledgement and labelled intervals are required before scoring.';
+};
+repaint();
+</script></body></html>

@@ -1,0 +1,78 @@
+{
+  "version": "0.5.2",
+  "recording": {
+    "filename": "candidate.db3",
+    "sha256": "ee7f6fdb4b535a3a60443ab9abdf44c11c6b4531a4090d7f2dbcca071f22d3f0",
+    "messages": 1390,
+    "duration_s": 19.95
+  },
+  "reference": {
+    "filename": "baseline.db3",
+    "sha256": "8a570821d0efe7b693b1d8799e6b44de46e694b161d84490b5ef4f53c58f169a"
+  },
+  "criteria": {
+    "topic": null,
+    "expected_hz": null,
+    "ratio_threshold": 3.0,
+    "min_count": 10,
+    "min_consecutive": 2
+  },
+  "topics": [
+    {
+      "topic": "/robot/cmd_vel",
+      "type": "geometry_msgs/msg/Twist",
+      "status": "RATE_EPISODES_FOUND",
+      "reference_mean_hz": 20.0,
+      "baseline_method": "reference bag recorded Hz",
+      "messages": 1270,
+      "duration_s": 19.95,
+      "window_origin_ns": 1740000010000000000,
+      "first_complete_bin_index": 1,
+      "count_by_second": [
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        165,
+        165,
+        165,
+        165,
+        165,
+        165,
+        20,
+        20,
+        20
+      ],
+      "episodes": [
+        {
+          "start_ns": 1740000021000000000,
+          "end_ns": 1740000027000000000,
+          "start_s_from_topic": 11,
+          "duration_s": 6,
+          "messages_in_windows": 990,
+          "max_messages_per_s": 165,
+          "baseline_hz": 20.0,
+          "peak_ratio": 8.25,
+          "baseline_method": "reference bag recorded Hz",
+          "evidence": "recorded message arrival times only; not fault or attack classification"
+        }
+      ],
+      "note": "Non-detection does not mean normal. Full-recording sustained high rate cannot be detected without a reference or declared expectation."
+    }
+  ],
+  "episode_count": 1,
+  "caveats": [
+    "This detects increases in bag-recorded topic message density, NOT originating publish frequency, DoS or real robot faults.",
+    "Unobserved/dropped messages may hide true publisher rates. Different workloads can naturally change topic rates.",
+    "No rate determination is made on incomplete histogram coverage, partial edge-second bins or unmatched baselines.",
+    "Short bursts that do not persist across the minimum consecutive full windows are not labeled.",
+    "Without reference, a consistently high-frequency recording may have no local rate episode."
+  ]
+}

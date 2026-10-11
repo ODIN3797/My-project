@@ -4,6 +4,7 @@ The first recording is an operator-supplied reference, *not* certified healthy.
 Rate heuristics are not safety alarms or proof of attack / root cause.
 """
 from __future__ import annotations
+from . import __version__
 
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -178,7 +179,7 @@ def compare_summaries(baseline: dict, candidates: list[dict], ratio_threshold=3.
         cases.append({'candidate':candidate, 'topic_comparisons':rows,
                       'rate_increases':sum(x['status']=='RATE_INCREASE' for x in rows),
                       'rate_decreases':sum(x['status']=='RATE_DECREASE' for x in rows)})
-    return {'version':'0.5.2', 'reference':baseline, 'candidate_cases':cases,
+    return {'version':__version__, 'reference':baseline, 'candidate_cases':cases,
             'criteria':{'ratio_threshold':ratio_threshold,'min_baseline_hz':min_baseline_hz,
                         'min_candidate_hz':min_candidate_hz,'min_duration_s':min_duration_s},
             'caveats':['Supplied baseline is operator-declared, not automatically known healthy.',

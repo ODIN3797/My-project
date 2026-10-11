@@ -87,6 +87,14 @@ def main(argv: list[str] | None = None) -> int:
     rate.add_argument('--min-consecutive',type=int,default=2)
     rate.add_argument('--min-count',type=int,default=10)
     rate.add_argument('--max-messages',type=int,default=2000000)
+    init_labels=sub.add_parser('init-rate-labels',help='make UNREVIEWED annotation template from a rate report')
+    init_labels.add_argument('rate_report',type=Path,help='output of inspect-rates: rate_timeline.json')
+    init_labels.add_argument('--topic',required=True,help='exact topic to annotate')
+    init_labels.add_argument('--output',type=Path,default=Path('rate_annotations.json'))
+    score=sub.add_parser('score-rate-labels',help='score time-localized rate episodes against explicitly reviewed intervals')
+    score.add_argument('rate_report',type=Path,help='output of inspect-rates: rate_timeline.json')
+    score.add_argument('labels',type=Path,help='human-reviewed interval JSON, same bag SHA256')
+    score.add_argument('--output',type=Path,default=Path('rate_evaluation'))
     gui=sub.add_parser('gui',help='local-only browser UI with drag-and-drop upload')
     gui.add_argument('--port',type=int,default=8765)
     gui.add_argument('--output',type=Path,default=Path('output_gui'))
@@ -144,6 +152,17 @@ def main(argv: list[str] | None = None) -> int:
                 min_consecutive=args.min_consecutive,min_count=args.min_count)
             print(f"Rate episodes: {result['episode_count']} from {len(result['topics'])} selected topics")
             print(f'HTML: {args.output / "rate_timeline.html"}\nJSON: {args.output / "rate_timeline.json"}')
+            return 0
+        if args.command=='init-rate-labels':
+            from .label_evaluation import write_template
+            t=write_template(args.rate_report,args.topic,args.output)
+            print(f'UNREVIEWED template: {args.output} (no diagnostic metrics yet)')
+            return 0
+        if args.command=='score-rate-labels':
+            from .label_evaluation import write_evaluation
+            result=write_evaluation(args.rate_report,args.labels,args.output)
+            print(f"Labelled recall: {result['positive_recall']} | False alarms/reviewed hour: {result['false_alarms_per_hour']}")
+            print(f'HTML: {args.output / "evaluation.html"}\nJSON: {args.output / "evaluation.json"}')
             return 0
         if args.command=='gui':
             from .gui import run_gui

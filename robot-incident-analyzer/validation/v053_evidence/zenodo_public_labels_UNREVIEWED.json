@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "recording_sha256": "a0d8134f693ee8409790240fcf52e500b646feae76e70260d1e4f0a183ec4dd0",
+  "topic": "/mobile_base_controller/cmd_vel",
+  "message_type": "geometry_msgs/msg/Twist",
+  "reviewer": "",
+  "ground_truth_status": "unreviewed",
+  "positive_intervals": [],
+  "negative_intervals": [],
+  "review_notes": "Template only: label exact start_ns/end_ns in Unix nanoseconds. Set ground_truth_status to reviewed ONLY after independent review; positives and explicitly checked negative intervals must not overlap. Unreviewed intervals are ignored, not counted as negatives."
+}

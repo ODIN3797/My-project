@@ -1,4 +1,22 @@
-# Robot Incident Analyzer v0.5.2 — Rate Timeline & Incident Workbench
+## New in v0.5.3: reviewable detection metrics
+
+Offline labeling and scoring for **recorded message-rate episodes** only (not all robot faults):
+
+```bash
+python3 -m robot_incident_analyzer inspect-rates candidate.db3 \
+  --reference approved_normal.db3 --output rate_report
+python3 -m robot_incident_analyzer init-rate-labels rate_report/rate_timeline.json \
+  --topic /robot/cmd_vel --output rate_annotations.json
+# Open rate_annotations.html and mark independently verified intervals
+python3 -m robot_incident_analyzer score-rate-labels \
+  rate_report/rate_timeline.json rate_annotations.json --output scored
+```
+
+The HTML annotation UI works offline, hides model predictions until the reviewer reveals them, and never marks intervals as reviewed automatically. Only an explicit reviewer and checked, disjoint positive/negative intervals permit scoring. Outputs include labeled recall, median detection delay and false alarms per **reviewed normal hour**. Missing reference labels are **unknown**, not normal. [Korean manual](docs/LABEL_EVALUATION_V053_KR.md).
+
+**The synthetic demonstration is NOT external ground truth**. Independent Zenodo/Vigo/BAGEL recordings have not yet been fully annotated for fault onset, so physical fault precision, recall and false alarms per hour remain unknown.
+
+# Robot Incident Analyzer v0.5.3 — Rate Timeline & Incident Workbench
 
 **Offline ROS2 incident triage, synchronized evidence charts, source-scoped odometry position markers, and optional local PDF export.**
 

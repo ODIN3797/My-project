@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "evaluation_kind": "human-reviewed-intervals",
+  "recording_sha256": "ee7f6fdb4b535a3a60443ab9abdf44c11c6b4531a4090d7f2dbcca071f22d3f0",
+  "topic": "/robot/cmd_vel",
+  "message_type": "geometry_msgs/msg/Twist",
+  "reviewer": "synthetic-fixture-author",
+  "reference_status": "operator-declared reviewed, not independently audited",
+  "positive_count": 1,
+  "detected_positives": 1,
+  "missed_positives": 0,
+  "positive_recall": 1.0,
+  "negative_reviewed_seconds": 9.0,
+  "false_alarm_count": 0,
+  "false_alarms_per_hour": 0.0,
+  "detection_delay_median_seconds": 0.0,
+  "unscored_prediction_count": 0,
+  "matched_positive_details": [
+    {
+      "positive_index": 0,
+      "label_start_ns": 1740000021000000000,
+      "label_end_ns": 1740000027000000000,
+      "found": true,
+      "prediction_start_ns": 1740000021000000000,
+      "onset_difference_s": 0.0,
+      "detection_delay_s": 0.0
+    }
+  ],
+  "false_alarm_prediction_indices": [],
+  "unscored_prediction_indices": [],
+  "notes": [
+    "No precision claim: incidents outside annotated positive/negative coverage are unknown, not false positives.",
+    "A predicted episode is counted as false alarm only when fully contained in an explicitly reviewed negative interval.",
+    "Detection is time-overlap with a labelled interval, not confirmed root-cause classification.",
+    "Median delay is computed from time-binned episode start; onset is manually annotated and not ground-truth verified by software.",
+    "Review coverage is per exact topic and message type; results do not measure all robot faults."
+  ]
+}

@@ -72,6 +72,7 @@ def decode_standard(msgtype: str, payload: bytes) -> Any:
     supported = (
         'geometry_msgs/Twist', 'geometry_msgs/TwistStamped', 'nav_msgs/Odometry',
         'tf2_msgs/TFMessage', 'diagnostic_msgs/DiagnosticArray',
+        'sensor_msgs/BatteryState', 'sensor_msgs/Imu',
     )
     if msgtype not in supported:
         return None
@@ -100,6 +101,37 @@ def decode_standard(msgtype: str, payload: bytes) -> Any:
             transforms.append({'stamp': stamp, 'parent': parent, 'child': child,
                                'translation': translation, 'rotation': rotation})
         return transforms
+    if msgtype == 'sensor_msgs/BatteryState':
+        # sensor_msgs/msg/BatteryState (ROS2 common_interfaces); all quantities
+        # retain the schema's units. Unmeasured percentage is NaN, not zero.
+        c.header()
+        voltage, temperature, current, charge, capacity, design_capacity, percentage = (
+            c.read('f', 4) for _ in range(7))
+        status, health, technology = (c.read('B', 1) for _ in range(3))
+        present = bool(c.read('?', 1))
+        for _ in range(2):
+            count = c.sequence_count(4096)
+            c.skip(count * 4, 4)
+        # Mandatory trailing strings: fail if payload is truncated.
+        location, serial = c.string(), c.string()
+        return {'voltage': voltage, 'temperature': temperature, 'current': current,
+                'charge': charge, 'capacity': capacity, 'design_capacity': design_capacity,
+                'percentage': percentage, 'status': status, 'health': health,
+                'technology': technology, 'present': present}
+    if msgtype == 'sensor_msgs/Imu':
+        c.header()
+        orientation = c.quaternion()
+        orientation_cov_first = c.read('d')
+        c.skip(8 * 8)
+        angular_velocity = c.vector3()
+        angular_cov_first = c.read('d')
+        c.skip(8 * 8)
+        linear_accel = c.vector3()
+        accel_cov_first = c.read('d')
+        c.skip(8 * 8)
+        return {'orientation': orientation, 'orientation_available': orientation_cov_first != -1.0,
+                'angular_velocity': angular_velocity, 'angular_available': angular_cov_first != -1.0,
+                'linear_acceleration': linear_accel, 'accel_available': accel_cov_first != -1.0}
     if msgtype == 'diagnostic_msgs/DiagnosticArray':
         c.header()
         statuses = []
@@ -153,6 +185,9 @@ class TelemetryAnalyzer:
         self.thresholds = validate_thresholds(thresholds)
         self.last_odom = {}  # per topic, never cross-correlate distinct odom sources
         self.last_tf = {}
+        self.last_battery_health = {}
+        self.last_battery_low = {}
+        self.last_imu_invalid = {}
         self.cmd_streams = defaultdict(list)
         self.odom_streams = defaultdict(list)
         self.topics = {}
@@ -171,7 +206,8 @@ class TelemetryAnalyzer:
         canonical = canonical_type(msgtype)
         self.topics[topic] = msgtype
         standard = {'geometry_msgs/Twist', 'geometry_msgs/TwistStamped', 'nav_msgs/Odometry',
-                    'tf2_msgs/TFMessage', 'diagnostic_msgs/DiagnosticArray'}
+                    'tf2_msgs/TFMessage', 'diagnostic_msgs/DiagnosticArray',
+                    'sensor_msgs/BatteryState', 'sensor_msgs/Imu'}
         custom = canonical in self.custom_roles and canonical not in standard
         if canonical not in standard and not custom:
             self.unsupported.add(msgtype)
@@ -185,6 +221,28 @@ class TelemetryAnalyzer:
                 decoded = decode_standard(msgtype, data)
         except (ValueError, struct.error, OverflowError, RecursionError):
             self.decode_failures += 1
+            return
+        if canonical == 'sensor_msgs/BatteryState':
+            # Only explicit standardized health codes signal an abnormal health
+            # state; percentage alone is NOT a hardware failure.
+            abnormal = decoded['health'] in range(2, 9)
+            if abnormal and self.last_battery_health.get(topic) != decoded['health']:
+                names = {2:'OVERHEAT',3:'DEAD',4:'OVERVOLTAGE',5:'UNSPEC_FAILURE',
+                         6:'COLD',7:'WATCHDOG_TIMER_EXPIRE',8:'SAFETY_TIMER_EXPIRE'}
+                self.emit(ts, 'BATTERY_HEALTH_ABNORMAL',
+                          f'{topic}: BatteryState reports health={names[decoded["health"]]} '
+                          '(publisher-reported status, not independently verified).', topic, 'ERROR')
+            self.last_battery_health[topic] = decoded['health']
+            return
+        if canonical == 'sensor_msgs/Imu':
+            # ROS2 Imu convention: orientation_covariance[0] == -1 indicates
+            # orientation not estimated. Do NOT flag its placeholder quaternion.
+            invalid = decoded['orientation_available'] and not valid_quat(decoded['orientation'])
+            if invalid and not self.last_imu_invalid.get(topic, False):
+                self.emit(ts, 'IMU_INVALID_QUATERNION',
+                          f'{topic}: IMU orientation quaternion is invalid and covariance does not mark it unavailable.',
+                          topic)
+            self.last_imu_invalid[topic] = invalid
             return
         if canonical.startswith('geometry_msgs/Twist') or (custom and self.custom_roles[canonical]['role'] == 'command'):
             self.cmd_streams[topic].append((ts,decoded))

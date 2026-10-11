@@ -1,4 +1,4 @@
-# Robot Incident Analyzer — v0.4.3
+# Robot Incident Analyzer — v0.4.4
 
 **Offline ROS2 incident triage · MCAP/DB3 · standard and explicitly configured custom `.msg` schemas.**
 
@@ -156,7 +156,7 @@ python3 -m robot_incident_analyzer field-validate \
 Details: [Overseas engineer field-pilot guide](docs/FIELD_PILOT_EN.md) and [한국어 검증 보고](docs/FIELD_VALIDATION_KR.md). Never publish unredacted customer or employer logs.
 
 
-## v0.4.3 — external data readiness (2026-10-11)
+## v0.4.4 — external data readiness (2026-10-11)
 
 - Includes system `libzstd` fallback for native zstd-compressed MCAP chunks when Python `zstandard` is not installed (requires OS shared library; Windows/macOS users may still need the Python package).
 - Rejects corrupted MCAP chunk CRC and truncated/missing file trailer instead of silently reporting success.
@@ -164,3 +164,11 @@ Details: [Overseas engineer field-pilot guide](docs/FIELD_PILOT_EN.md) and [한�
 - Provides `scripts/validate_local_real_bag.sh`, independent data acceptance checklists and reproducible execution guidance.
 - **Actual externally recorded physical robot bag tested: 0; overseas engineers who ran the tool: 0.** A source URL is not a successful dataset download. Do not claim field accuracy based on this release.
 - See `docs/EXTERNAL_RECORDING_ACCEPTANCE_KR.md` and `docs/EXTERNAL_RECORDING_ACCEPTANCE_EN.md`.
+
+
+## v0.4.4 — standard battery and IMU inspection
+
+- Bounded CDR decoding for `sensor_msgs/msg/BatteryState` and `sensor_msgs/msg/Imu`.
+- Explicit BMS health errors trigger `BATTERY_HEALTH_ABNORMAL`; low charge alone never triggers a fault.
+- The ROS2 `orientation_covariance[0] == -1` sentinel is honored; unavailable orientation is not flagged.
+- These heuristics still require review of the bag's provenance, message types and publisher behavior.

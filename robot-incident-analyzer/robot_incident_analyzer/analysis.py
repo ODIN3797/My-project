@@ -96,6 +96,12 @@ def build_findings(events: list[Event]) -> list[Finding]:
         'DIAGNOSTIC_ERROR': ('Hardware or software diagnostic ERROR',
                              'At least one ROS diagnostic status reported an ERROR.',
                              ['Inspect diagnostic hardware ID and nearby /rosout events.', 'Check whether the status later recovered.']),
+        'BATTERY_HEALTH_ABNORMAL': ('Battery status reports abnormal health',
+                             'BatteryState published an explicit abnormal power-supply-health code; the message alone does not identify its cause.',
+                             ['Inspect BMS status and battery temperature/voltage.', 'Verify the publisher health-code mapping and timestamps.']),
+        'IMU_INVALID_QUATERNION': ('IMU published invalid orientation',
+                             'An IMU orientation quaternion is not normalized or finite, and its covariance does not flag unavailable orientation.',
+                             ['Inspect IMU calibration and publisher output.', 'Check orientation_covariance[0] and fusion node state.']),
         'DIAGNOSTIC_STALE': ('Stale diagnostics reported',
                              'A diagnostic status was marked STALE.',
                              ['Verify monitoring frequency and publisher connectivity.']),
@@ -104,7 +110,7 @@ def build_findings(events: list[Event]) -> list[Finding]:
         matching = [e for e in events if e.code == code]
         if matching:
             findings.append(Finding(code=code, title=title, severity='HIGH' if code in (
-                'DIAGNOSTIC_ERROR','TF_INVALID_QUATERNION','ODOM_INVALID_QUATERNION') else 'MEDIUM',
+                'DIAGNOSTIC_ERROR','TF_INVALID_QUATERNION','ODOM_INVALID_QUATERNION','BATTERY_HEALTH_ABNORMAL') else 'MEDIUM',
                 explanation=explanation + f' ({len(matching)} observation(s) in the selected recordings.)',
                 suggested_checks=checks, evidence_ids=[e.event_id for e in matching[:6]],
                 confidence='direct observed signal / root cause not verified'))

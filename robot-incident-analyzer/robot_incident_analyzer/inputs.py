@@ -133,10 +133,12 @@ def is_periodic_sensor(topic: str) -> bool:
 
 
 def read_rosbag(path: Path, max_messages: int = 200_000, *, with_details: bool = False,
-                topic_map=None, thresholds=None, schema_registry=None, custom_roles=None):
+                topic_map=None, thresholds=None, schema_registry=None, custom_roles=None, state_keys=None):
     from collections import defaultdict
     from .bag_reader import read_bag
     from .telemetry import TelemetryAnalyzer
+    from .state_timeline import state_tokens
+    from .discovery import robot_namespace
     warnings: list[str] = []
     times: dict[tuple[str, str], list[float]] = defaultdict(list)
     events: list[Event] = []
@@ -156,10 +158,11 @@ def read_rosbag(path: Path, max_messages: int = 200_000, *, with_details: bool =
                 warnings.append(f'{path.name}: one /rosout log could not be decoded')
                 continue
             severity = LOG_LEVELS.get(level, 'INFO')
-            if severity in ('WARN', 'ERROR', 'FATAL'):
+            if severity in ('WARN', 'ERROR', 'FATAL') or state_tokens(msg, state_keys):
                 events.append(Event(timestamp=ts, severity=severity, category='rosout',
                                     code=classify(msg), message=f'[{node}] {msg}'[:4000],
-                                    source=path.name, topic=topic))
+                                    source=path.name, topic=topic,
+                                    robot_id=robot_namespace(topic) or 'unknown'))
         else:
             telemetry.ingest(topic,msgtype,ts,data)
 
@@ -203,7 +206,7 @@ def read_rosbag_db3(path: Path, max_messages: int = 200_000):
 
 def collect_inputs(inputs: list[Path], max_messages: int = 200_000, *,
                    with_details: bool = False, topic_map=None, thresholds=None,
-                   schema_registry=None, custom_roles=None):
+                   schema_registry=None, custom_roles=None, state_keys=None):
     files: list[Path] = []
     for given in inputs:
         if given.is_dir():
@@ -223,11 +226,11 @@ def collect_inputs(inputs: list[Path], max_messages: int = 200_000, *,
             if with_details:
                 ev,st,warn,detail=read_rosbag(path,max_messages,with_details=True,
                                              topic_map=topic_map,thresholds=thresholds,
-                                             schema_registry=schema_registry,custom_roles=custom_roles)
+                                             schema_registry=schema_registry,custom_roles=custom_roles,state_keys=state_keys)
                 details.append(detail)
             else:
                 ev,st,warn=read_rosbag(path,max_messages,topic_map=topic_map,thresholds=thresholds,
-                                             schema_registry=schema_registry,custom_roles=custom_roles)
+                                             schema_registry=schema_registry,custom_roles=custom_roles,state_keys=state_keys)
             events.extend(ev); stats.extend(st); warnings.extend(warn)
     events.sort(key=lambda e:(e.timestamp,e.source,e.code))
     for index,event in enumerate(events,1):

@@ -12,9 +12,10 @@ import math
 from pathlib import Path
 
 from .incident_workbench import cases_from_findings
+from .state_timeline import build_state_transitions
 
 
-def export_pdf(path, events, findings, stats, warnings, input_files, details):
+def export_pdf(path, events, findings, stats, warnings, input_files, details, *, state_keys=None):
     try:
         from reportlab.lib import colors
         from reportlab.lib.enums import TA_CENTER
@@ -69,7 +70,18 @@ def export_pdf(path, events, findings, stats, warnings, input_files, details):
         items.append(para('Coverage notes',h2))
         for msg in warnings[:8]:items.append(para('• '+msg,small))
         if len(warnings)>8:items.append(para('... further warnings omitted; consult report.json.',small))
-    cases=cases_from_findings(findings,events,details,limit=20)
+    state_transitions=build_state_transitions(events, state_keys)
+    cases=cases_from_findings(findings,events,details,limit=20,state_transitions=state_transitions)
+    if state_transitions:
+        items.append(para('Observed robot state transitions',h2))
+        items.append(para('Only explicit key=value log statements; not verified controller state.',small))
+        for item in state_transitions[:20]:
+            ts=datetime.fromtimestamp(item['timestamp'],tz=timezone.utc).strftime('%H:%M:%S.%f')[:-3]
+            label=f"{ts} | {item['source']} / {item['robot_id']} | {item['field']}: {item['from'] or '[first]'} -> {item['to']} | {item['event_id']}"
+            items.append(para(label,small))
+        if len(state_transitions)>20:items.append(para('Additional state transitions in report.json.',small))
+    else:
+        items.append(para('No explicit robot state assignments observed (state unknown).',small))
     if not cases:items.append(para('No evidence-linked incident candidates. This is not proof of a healthy robot.',normal))
 
     def series_drawing(series, anchor, width=485, height=100):
@@ -118,6 +130,14 @@ def export_pdf(path, events, findings, stats, warnings, input_files, details):
         items.extend([para(f'Investigation {i+1} · {c["severity"]}',h3),para(c['title'],h1),
                       para('Time: '+datetime.fromtimestamp(c['anchor'],tz=timezone.utc).isoformat(timespec='milliseconds')+' | Source: '+c['source'],small),
                       para(c['description'],normal),para('Evidence IDs: '+', '.join(c['evidence_ids'])+' | '+c['confidence'],small)])
+        changes=c.get('state_context',{}).get('transitions',[])
+        items.append(para(c.get('state_summary',''),small))
+        if changes:
+            items.append(para('Recorded state changes within 30 s before/at incident',h2))
+            for transition in changes[-6:]:
+                dt=transition['timestamp']-c['anchor']
+                items.append(para(f"{dt:+.2f}s | {transition['field']}: {transition['from'] or '[first]'} -> {transition['to']} ({transition['event_id']})",small))
+        else:items.append(para('No explicit state changes recorded in prior 30 s; do not infer state.',small))
         if c['checks']:
             items.append(para('Suggested checks',h2))
             for k in c['checks'][:4]:items.append(para('• '+k,small))

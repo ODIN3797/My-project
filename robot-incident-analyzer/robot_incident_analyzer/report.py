@@ -9,6 +9,7 @@ from . import __version__
 from .dashboard import DASHBOARD_CSS, density_timeline, top_sources, topic_volume, topic_timing_variation, dashboard_script
 from .signal_studio import STUDIO_CSS, studio_markup, studio_script
 from .incident_workbench import WORKBENCH_CSS, workbench_markup, workbench_script, cases_from_findings
+from .state_timeline import STATE_CSS, build_state_transitions, state_markup, state_script
 
 STYLE = '''
 :root{color-scheme:dark;--bg:#0b1120;--panel:#111d30;--border:#25344b;--fg:#e7edf7;--muted:#9aaac0;--accent:#7fd1cf;--warn:#f5c46b;--error:#fa9097}
@@ -116,7 +117,7 @@ def render_discovery(details: list[dict]) -> str:
 
 
 def render_report(events: list[Event], findings: list[Finding], stats: list[TopicStats],
-                  warnings: list[str], input_files: list[Path], details: list[dict] | None = None) -> str:
+                  warnings: list[str], input_files: list[Path], details: list[dict] | None = None, state_keys=None) -> str:
     """Incident-first offline HTML dashboard; no internet access or JS dependencies."""
     details = details or []
     display_events = sorted(events, key=lambda e: (e.timestamp, e.event_id))[:2000]
@@ -134,7 +135,8 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
         f'<span class="kpi-label">{esc(label)}</span></div>'
         for value, label in metrics)
 
-    cases = cases_from_findings(findings, events, details)
+    transitions = build_state_transitions(events, state_keys)
+    cases = cases_from_findings(findings, events, details, state_transitions=transitions)
     case_lookup = {(case["code"], case["evidence_ids"][0]): idx for idx, case in enumerate(cases) if case["evidence_ids"]}
     # Navigable event evidence never silently vanishes due to filters.
     evidence_visible = {e.event_id for e in display_events}
@@ -208,7 +210,7 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
     event_window=(f'{utc_iso(min(e.timestamp for e in events))} — {utc_iso(max(e.timestamp for e in events))}'
                   if events else 'No events')
     file_names=', '.join(p.name for p in input_files)
-    css = STYLE + '\n' + DASHBOARD_CSS + '\n' + STUDIO_CSS + '\n' + WORKBENCH_CSS
+    css = STYLE + '\n' + DASHBOARD_CSS + '\n' + STUDIO_CSS + '\n' + WORKBENCH_CSS + '\n' + STATE_CSS
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Robot Incident Analyzer | Incident Overview</title><style>{css}</style></head>
@@ -219,9 +221,10 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
   <a class="nav-link" href="#overview"><span class="nav-num">01</span> Overview</a>
   <a class="nav-link" href="#findings"><span class="nav-num">02</span> Findings</a>
   <a class="nav-link" href="#incident-workbench"><span class="nav-num">03</span> Workbench</a>
-  <a class="nav-link" href="#signals"><span class="nav-num">04</span> Signals</a>
-  <a class="nav-link" href="#timeline"><span class="nav-num">05</span> Event log</a>
-  <a class="nav-link" href="#topics"><span class="nav-num">06</span> Topic coverage</a>
+  <a class="nav-link" href="#state-timeline"><span class="nav-num">04</span> Robot states</a>
+  <a class="nav-link" href="#signals"><span class="nav-num">05</span> Signals</a>
+  <a class="nav-link" href="#timeline"><span class="nav-num">06</span> Event log</a>
+  <a class="nav-link" href="#topics"><span class="nav-num">07</span> Topic coverage</a>
  </nav>
  <div class="rail-bottom"><strong>Offline by design</strong><br>No files uploaded to external servers. No AI API. Correlation ≠ causation.<br><br>Experimental diagnostics only.</div>
 </aside>
@@ -241,7 +244,8 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
 </div></section>
 <section id="findings" aria-labelledby="findings-title"><div class="section-head"><div><h2 id="findings-title">Investigation queue</h2><p>Evidence-backed observations with concrete follow-up checks, not AI-generated certainty.</p></div><span class="pill-inline">{high} high priority</span></div>
 <div class="findings-grid">{''.join(finding_cards)}</div></section>
-{workbench_markup(findings, events, details)}
+{workbench_markup(findings, events, details, state_transitions=transitions)}
+{state_markup(transitions)}
 <section id="signals" aria-labelledby="signals-title"><div class="section-head"><div><h2 id="signals-title">Velocity comparison · Signal explorer</h2><p>Aligned command/odometry speeds and expandable anomaly windows where both streams exist.</p></div></div>
 {studio_markup(details, events)}
 {''.join(plots) if plots else '<div class="box-card empty">No unambiguous command / odometry pair recorded. Inspect topic mapping and coverage below.</div>'}
@@ -264,17 +268,19 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
 <li>Event table displays at most 2,000 records; full results are in report.json.</li>{warnings_html}</ul></div>
 </section>
 <footer class="topic-caption" style="margin-top:30px">Robot Incident Analyzer · Generated locally · Research prototype. Review data before sharing reports.</footer>
-</main></div>{dashboard_script()}{studio_script()}{workbench_script()}</body></html>'''
+</main></div>{dashboard_script()}{studio_script()}{workbench_script()}{state_script()}</body></html>'''
 
 
 def save_report(output_dir: Path, events: list[Event], findings: list[Finding],
                 stats: list[TopicStats], warnings: list[str], input_files: list[Path],
-                details: list[dict] | None = None):
+                details: list[dict] | None = None, state_keys=None):
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = {'tool': 'Robot Incident Analyzer', 'version': __version__,
                'scope': 'offline; recording timestamps; evidence is not root-cause proof',
                'inputs': [p.name for p in input_files], 'warnings': warnings,
                'events': [e.to_dict() for e in events], 'findings': [f.to_dict() for f in findings],
-               'topic_stats': [s.to_dict() for s in stats], 'telemetry': details or []}
+               'topic_stats': [s.to_dict() for s in stats], 'telemetry': details or [],
+               'state_transitions':build_state_transitions(events, state_keys),
+               'state_config_keys':list(state_keys) if state_keys is not None else None}
     (output_dir / 'report.json').write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding='utf-8')
-    (output_dir / 'report.html').write_text(render_report(events, findings, stats, warnings, input_files, details), encoding='utf-8')
+    (output_dir / 'report.html').write_text(render_report(events, findings, stats, warnings, input_files, details, state_keys), encoding='utf-8')

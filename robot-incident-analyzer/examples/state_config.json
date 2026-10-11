@@ -1,0 +1,11 @@
+{
+  "state_keys": [
+    "mode",
+    "docking_state",
+    "charging_state",
+    "mission_state",
+    "command_state",
+    "safety_state",
+    "lift_state"
+  ]
+}

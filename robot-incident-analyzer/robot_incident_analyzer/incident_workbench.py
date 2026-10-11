@@ -48,12 +48,13 @@ def same_robot_topic(topic: str, robot_id: str) -> bool:
     return len(pieces) < 2 or not robot_ns or pieces[0] == robot_id
 
 
-def cases_from_findings(findings, events, details, *, limit=24, before=10., after=10.):
+def cases_from_findings(findings, events, details, *, limit=24, before=10., after=10., state_transitions=None):
     """Build source-scoped investigation views, bounded for standalone HTML.
 
     Cases with missing evidence are retained but never joined to unrelated
     sources or imagined timestamps.
     """
+    from .state_timeline import preceding_state_context, summarize_state_context, _source, _namespace
     by_id = {e.event_id: e for e in events}
     cases=[]
     for idx, finding in enumerate(findings[:limit]):
@@ -65,8 +66,8 @@ def cases_from_findings(findings, events, details, *, limit=24, before=10., afte
             continue
         source=anchor.source
         t=anchor.timestamp
-        relevant=[e for e in events if e.source==source and math.isfinite(e.timestamp)
-                  and t-before <= e.timestamp <= t+after]
+        relevant=[e for e in events if _source(e)==_source(anchor) and (_namespace(e)==_namespace(anchor) or _namespace(e)=='unknown')
+                  and math.isfinite(e.timestamp) and t-before <= e.timestamp <= t+after]
         # Prefer events directly cited by the finding, then nearby observations.
         related_ids=set(finding.evidence_ids)
         relevant.sort(key=lambda e:(e.event_id not in related_ids,abs(e.timestamp-t),e.event_id))
@@ -87,12 +88,15 @@ def cases_from_findings(findings, events, details, *, limit=24, before=10., afte
                     paths.append(path)
         signals.sort(key=lambda s:(-priority(finding.code,s.get('field',''),s.get('topic','')),
                                    s.get('topic',''),s.get('field','')))
+        state_context = preceding_state_context(anchor, state_transitions or [])
         cases.append({
             'id': f'C{idx+1:03d}', 'title': finding.title, 'code':finding.code,
             'severity':finding.severity, 'description':finding.explanation,
             'checks':finding.suggested_checks[:5], 'confidence':finding.confidence,
             'anchor':t, 'source':source, 'robot_id':anchor.robot_id, 'topic':anchor.topic,
             'evidence_ids':finding.evidence_ids[:12],
+            'state_context':state_context,
+            'state_summary':summarize_state_context(state_context),
             'events':[{'id':e.event_id,'t':e.timestamp,'code':e.code,
                        'severity':e.severity,'message':e.message[:250]} for e in relevant[:25]],
             'signals':signals[:8], 'paths':paths[:2],
@@ -140,8 +144,8 @@ WORKBENCH_CSS=r'''
 '''
 
 
-def workbench_markup(findings, events, details):
-    cases=cases_from_findings(findings,events,details)
+def workbench_markup(findings, events, details, *, state_transitions=None):
+    cases=cases_from_findings(findings,events,details,state_transitions=state_transitions)
     data=escape_json({'cases':cases})
     if not cases:
         intro='<div class="case-empty">No evidence-linked findings in this recording. Not a health clearance.</div>'
@@ -150,6 +154,7 @@ def workbench_markup(findings, events, details):
  <select id="case-select" class="case-picker" aria-label="Choose a finding to investigate"></select>
  <span class="case-badge">±10 s evidence · configurable</span></div>
  <div id="case-header"></div>
+ <div id="case-states" class="case-state-panel" aria-label="Prior explicit robot state transitions"></div>
  <div class="case-controls"><label for="case-window">Time window</label><select id="case-window" aria-label="Context window"><option value="5">±5 s</option><option value="10" selected>±10 s</option><option value="30">±30 s</option></select>
  <button type="button" id="case-sync" class="case-event">↗ Sync main time cursor</button></div>
  <div id="case-charts" class="case-chart-grid" aria-label="Contextual multi-sensor graphs"></div>
@@ -170,7 +175,7 @@ def workbench_script():
  const selector=document.getElementById('case-select');if(!selector||!cases.length)return;
  const section=document.getElementById('incident-workbench');
  const header=document.getElementById('case-header'),plots=document.getElementById('case-charts'),events=document.getElementById('case-events');
- const windowSel=document.getElementById('case-window');let active=0;
+ const windowSel=document.getElementById('case-window'),states=document.getElementById('case-states');let active=0;
  const ns='http://www.w3.org/2000/svg';
  const dom=(tag,cls,content)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(content!==undefined)n.textContent=String(content);return n;};
  function svgNode(p,tag,attrs){const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs||{}))n.setAttribute(k,v);p.appendChild(n);return n;}
@@ -207,6 +212,13 @@ def workbench_script():
  const main=dom('div','case-heading');const h=dom('h3','',c.title);main.appendChild(h);main.appendChild(dom('span','case-badge',c.severity));header.appendChild(main);
  header.appendChild(dom('p','case-context',c.source+' · '+new Date(c.anchor*1000).toISOString()+' · '+c.code));
  header.appendChild(dom('p','case-context',c.description));header.appendChild(dom('p','case-context','Evidence: '+(c.evidence_ids.join(', ')||'None')+' · '+c.confidence));
+ if(states){states.replaceChildren();states.appendChild(dom('h4','','Explicit state changes at or before this observation · 30 s'));states.appendChild(dom('p','case-context',c.state_summary||''));
+  let context=c.state_context||{},changes=context.transitions||[];
+  if(!changes.length)states.appendChild(dom('p','case-caption','No explicit state transition observed within 30 s; state unknown, not assumed stable.'));
+  changes.forEach(x=>{const line=dom('div','case-state-item');const btn=dom('button','',x.field+': '+(x.from===null?'first observed':x.from)+' → '+x.to);
+   btn.type='button';btn.addEventListener('click',()=>{window.__riaMoveCursor?.(x.timestamp);document.getElementById('event-'+x.event_id)?.scrollIntoView({behavior:'smooth',block:'center'});});
+   line.appendChild(btn);line.appendChild(dom('span','',new Date(x.timestamp*1000).toISOString()+' · Δt '+(x.timestamp-c.anchor).toFixed(1)+' s · '+x.event_id));states.appendChild(line);});}
+ 
  const half=Number(windowSel.value)||10;let signals=c.signals.filter(s=>s.samples.some(p=>Math.abs(p[0]-c.anchor)<=half));
  signals.slice(0,4).forEach(s=>drawScalar(s,c,half));
  if(c.paths.length)drawPath(c.paths[0],c);

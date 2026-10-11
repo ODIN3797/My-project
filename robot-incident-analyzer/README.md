@@ -1,4 +1,4 @@
-# Robot Incident Analyzer v0.4.8 — Incident Workbench
+# Robot Incident Analyzer v0.4.9 — Incident Workbench
 
 **Offline ROS2 incident triage, synchronized evidence charts, source-scoped odometry position markers, and optional local PDF export.**
 
@@ -264,3 +264,15 @@ See [docs/STANDALONE_GITHUB_SETUP.md](docs/STANDALONE_GITHUB_SETUP.md). The owne
 
 Generated `report.html` now includes an offline evidence-centric dashboard with:
 stacked event histogram (click to filter the event table), severity/search filters, linked findings, preserved velocity traces, ROS2 topic count and recording gap visualizations. The design is responsive, and **no bag data is sent to the cloud**. See [competitor / feature analysis](docs/COMPETITOR_GAP_V046.md) and [release notes](RELEASE_NOTES_V046.md).
+
+
+## v0.4.9 — Explicit robot state timeline
+
+Inspect timestamped transitions extracted only from explicitly assigned keys such as `mode=AUTONOMOUS`, `docking_state=ALIGN` and `charging_state=FAILED`. The Incident Workbench summarizes source- and namespace-scoped state evidence from the previous 30 seconds. Raw transitions, with event IDs, appear in `report.json` and PDF.
+
+```bash
+python3 -m robot_incident_analyzer demo-states --output state_demo
+python3 -m robot_incident_analyzer analyze state_demo/fictional_state_transitions.mcap --output state_report --pdf
+```
+
+Pass `--config examples/state_config.json` for custom explicit state keys, e.g. `lift_state`. This is a **log-text state observation**, not verification of controller state. See `docs/STATE_TIMELINE_V049_EN.md` and `RELEASE_NOTES_V049.md`.

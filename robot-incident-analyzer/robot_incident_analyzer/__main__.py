@@ -15,7 +15,7 @@ def load_config(path: Path | None) -> dict:
     if path is None: return {}
     cfg=json.loads(path.read_text(encoding='utf-8'))
     if not isinstance(cfg,dict): raise ValueError('Configuration root must be an object')
-    if set(cfg)-{'topics','thresholds','schema_dirs','custom_messages'}: raise ValueError('Configuration has unknown top-level keys')
+    if set(cfg)-{'topics','thresholds','schema_dirs','custom_messages','state_keys'}: raise ValueError('Configuration has unknown top-level keys')
     if not isinstance(cfg.get('topics',{}),dict) or not isinstance(cfg.get('thresholds',{}),dict):
         raise ValueError('topics and thresholds must be JSON objects')
     if 'schema_dirs' in cfg:
@@ -24,6 +24,8 @@ def load_config(path: Path | None) -> dict:
         cfg['schema_dirs'] = [str((path.parent / x).resolve()) for x in cfg['schema_dirs']]
     if 'custom_messages' in cfg and not isinstance(cfg['custom_messages'],dict):
         raise ValueError('custom_messages must be a JSON object')
+    from .state_timeline import validate_state_keys
+    validate_state_keys(cfg.get('state_keys'))
     return cfg
 
 
@@ -34,9 +36,9 @@ def analyze_files(paths:list[Path], output:Path, config=None, max_messages=20000
     custom_roles = validate_custom_roles(config.get('custom_messages', {}), registry)
     events,stats,warnings,files,details=collect_inputs(paths,max_messages,with_details=True,
         topic_map=config.get('topics'),thresholds=config.get('thresholds'),
-        schema_registry=registry,custom_roles=custom_roles)
+        schema_registry=registry,custom_roles=custom_roles,state_keys=config.get('state_keys'))
     findings=build_findings(events)
-    save_report(output,events,findings,stats,warnings,files,details)
+    save_report(output,events,findings,stats,warnings,files,details, state_keys=config.get('state_keys'))
     return events,findings,stats,warnings,files,details
 
 
@@ -49,6 +51,8 @@ def main(argv: list[str] | None = None) -> int:
     demo.add_argument('--output',default='demo_data',type=Path)
     studio_demo=sub.add_parser('demo-studio', help='generate fictional trajectories and multi-sensor MCAP')
     studio_demo.add_argument('--output', default='studio_data', type=Path)
+    states_demo=sub.add_parser('demo-states',help='generate fictional docking/charging mode transitions with sensors')
+    states_demo.add_argument('--output',default='state_demo',type=Path)
     custom_demo=sub.add_parser('demo-custom',help='generate fictional custom message MCAP example')
     custom_demo.add_argument('--output',default='demo_custom',type=Path)
     analyze=sub.add_parser('analyze',help='generate HTML/JSON report from inputs')
@@ -83,6 +87,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f'Fictional multi-sensor MCAP: {path}')
             print(f'Next: python -m robot_incident_analyzer analyze {path} --output studio_report')
             return 0
+        if args.command=='demo-states':
+            from .fixture_states import make_state_demo
+            bag=make_state_demo(args.output)
+            print(f'Fictional state-change recording: {bag}')
+            print(f'Next: python -m robot_incident_analyzer analyze {bag} --output state_report')
+            return 0
         if args.command=='demo-custom':
             from .fixture_custom import make_custom_demo
             mcap=make_custom_demo(args.output)
@@ -110,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f'Auto discovery ({detail["source"]}): {detail["discovery"]["selected"]}')
         if args.pdf:
             from .pdf_export import export_pdf
-            export_pdf(args.output / "report.pdf",events,findings,stats,warnings,paths,details)
+            export_pdf(args.output / "report.pdf",events,findings,stats,warnings,paths,details,state_keys=load_config(args.config).get("state_keys"))
             print(f'PDF: {args.output / "report.pdf"}')
         print(f'HTML: {args.output / "report.html"}\nJSON: {args.output / "report.json"}')
         if warnings:

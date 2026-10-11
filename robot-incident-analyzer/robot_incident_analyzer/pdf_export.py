@@ -138,6 +138,17 @@ def export_pdf(path, events, findings, stats, warnings, input_files, details, *,
                 dt=transition['timestamp']-c['anchor']
                 items.append(para(f"{dt:+.2f}s | {transition['field']}: {transition['from'] or '[first]'} -> {transition['to']} ({transition['event_id']})",small))
         else:items.append(para('No explicit state changes recorded in prior 30 s; do not infer state.',small))
+        comparisons=c.get('sensor_comparisons',[])
+        if comparisons:
+            items.append(para('Observed sensor changes around logged states (2 s before / after)',h2))
+            items.append(para(c.get('sensor_comparison_summary',''),small))
+            for comparison in comparisons[:2]:
+                items.append(para(f"{comparison['field']}: {comparison['from'] or '[first]'} -> {comparison['to']} | evidence {comparison['event_id']}",small))
+                if not comparison['signals']:
+                    items.append(para('Insufficient nearby numeric samples; no comparison.',small))
+                for signal in comparison['signals'][:2]:
+                    items.append(para(f"{signal['topic']} / {signal['field']}: median {signal['before']:.3f} -> {signal['after']:.3f} (delta {signal['delta']:+.3f}, sample counts {signal['before_n']}/{signal['after_n']})",small))
+            items.append(para('Showing at most 2 logged transitions and 2 signals each; see report.json for complete comparisons. Recording-time proximity does not establish causation or statistical significance.',small))
         if c['checks']:
             items.append(para('Suggested checks',h2))
             for k in c['checks'][:4]:items.append(para('• '+k,small))

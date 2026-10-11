@@ -89,7 +89,7 @@ class SignalStudioV047Tests(unittest.TestCase):
             self.assertEqual(data['discovery']['selected']['command'],'/robot_a/cmd_vel')
             self.assertIn('BATTERY_HEALTH_ABNORMAL', {e.code for e in ev})
             report=json.loads((Path(tmp)/'output/report.json').read_text())
-            self.assertEqual(report['version'],'0.4.9')
+            self.assertEqual(report['version'],'0.5.0')
             html=(Path(tmp)/'output/report.html').read_text()
             self.assertIn('id="studio-path-chart"',html)
             self.assertIn('id="studio-time"',html)

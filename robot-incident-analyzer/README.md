@@ -1,8 +1,15 @@
-# Robot Incident Analyzer v0.4.9 — Incident Workbench
+# Robot Incident Analyzer v0.5.0 — State/Sensor Correlation Workbench
 
 **Offline ROS2 incident triage, synchronized evidence charts, source-scoped odometry position markers, and optional local PDF export.**
 
 This is an experimental diagnostic *aid*, not a validated root-cause detector. Time-aligned telemetry and nearby ROS logs are **not proof of causation**. It never uploads your recording to a server.
+
+## v0.5.0 — Sensor readings before and after observed state changes
+
+The **Incident workbench** now contrasts median numeric sensor values (velocity, battery, IMU, etc.) immediately before and after **explicitly logged** robot state changes. It uses two disjoint 2-second recording-time windows, requires at least two finite distinct samples per side and rejects stale windows. Findings show literal measurement summaries and separate state-vs-finding markers on the existing plots. Details are exported in `report.json` as `state_sensor_comparisons` and in the optional PDF dossier.
+
+See [English investigation guide](docs/STATE_SENSOR_V050_EN.md), [Korean notes](docs/STATE_SENSOR_V050_KR.md), and [release notes](RELEASE_NOTES_V050.md). Observed shifts are descriptive **not causal fault diagnosis**; logs can misstate a robot's actual operating state.
+
 
 ## What's new
 

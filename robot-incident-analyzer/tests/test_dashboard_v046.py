@@ -78,7 +78,7 @@ class DashboardV046Tests(unittest.TestCase):
             save_report(Path(temp),events,[],[],[],[Path('sample.csv')])
             payload=json.loads((Path(temp)/'report.json').read_text())
             self.assertEqual(len(payload['events']),2)
-            self.assertEqual(payload['version'],'0.4.9')
+            self.assertEqual(payload['version'],'0.5.0')
 
 
 if __name__=='__main__':

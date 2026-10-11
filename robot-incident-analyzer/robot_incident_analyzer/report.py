@@ -10,6 +10,7 @@ from .dashboard import DASHBOARD_CSS, density_timeline, top_sources, topic_volum
 from .signal_studio import STUDIO_CSS, studio_markup, studio_script
 from .incident_workbench import WORKBENCH_CSS, workbench_markup, workbench_script, cases_from_findings
 from .state_timeline import STATE_CSS, build_state_transitions, state_markup, state_script
+from .state_signal_compare import COMPARE_CSS, compare_script
 
 STYLE = '''
 :root{color-scheme:dark;--bg:#0b1120;--panel:#111d30;--border:#25344b;--fg:#e7edf7;--muted:#9aaac0;--accent:#7fd1cf;--warn:#f5c46b;--error:#fa9097}
@@ -210,7 +211,7 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
     event_window=(f'{utc_iso(min(e.timestamp for e in events))} — {utc_iso(max(e.timestamp for e in events))}'
                   if events else 'No events')
     file_names=', '.join(p.name for p in input_files)
-    css = STYLE + '\n' + DASHBOARD_CSS + '\n' + STUDIO_CSS + '\n' + WORKBENCH_CSS + '\n' + STATE_CSS
+    css = STYLE + '\n' + DASHBOARD_CSS + '\n' + STUDIO_CSS + '\n' + WORKBENCH_CSS + '\n' + STATE_CSS + '\n' + COMPARE_CSS
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Robot Incident Analyzer | Incident Overview</title><style>{css}</style></head>
@@ -268,19 +269,26 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
 <li>Event table displays at most 2,000 records; full results are in report.json.</li>{warnings_html}</ul></div>
 </section>
 <footer class="topic-caption" style="margin-top:30px">Robot Incident Analyzer · Generated locally · Research prototype. Review data before sharing reports.</footer>
-</main></div>{dashboard_script()}{studio_script()}{workbench_script()}{state_script()}</body></html>'''
+</main></div>{dashboard_script()}{studio_script()}{compare_script()}{workbench_script()}{state_script()}</body></html>'''
 
 
 def save_report(output_dir: Path, events: list[Event], findings: list[Finding],
                 stats: list[TopicStats], warnings: list[str], input_files: list[Path],
                 details: list[dict] | None = None, state_keys=None):
     output_dir.mkdir(parents=True, exist_ok=True)
+    transitions = build_state_transitions(events, state_keys)
+    dossiers = cases_from_findings(findings, events, details or [], state_transitions=transitions)
     payload = {'tool': 'Robot Incident Analyzer', 'version': __version__,
                'scope': 'offline; recording timestamps; evidence is not root-cause proof',
                'inputs': [p.name for p in input_files], 'warnings': warnings,
                'events': [e.to_dict() for e in events], 'findings': [f.to_dict() for f in findings],
                'topic_stats': [s.to_dict() for s in stats], 'telemetry': details or [],
-               'state_transitions':build_state_transitions(events, state_keys),
+               'state_transitions':transitions,
+               'state_sensor_comparisons': [
+                   {'case_id': c['id'], 'finding_code': c['code'],
+                    'source': c['source'], 'robot_id': c['robot_id'],
+                    'summary': c['sensor_comparison_summary'],
+                    'transitions': c['sensor_comparisons']} for c in dossiers],
                'state_config_keys':list(state_keys) if state_keys is not None else None}
     (output_dir / 'report.json').write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding='utf-8')
     (output_dir / 'report.html').write_text(render_report(events, findings, stats, warnings, input_files, details, state_keys), encoding='utf-8')

@@ -8,6 +8,7 @@ from __future__ import annotations
 import math
 import re
 from .signal_studio import escape_json
+from .state_signal_compare import transition_comparisons, summary_for_case
 
 
 def priority(code: str, field: str, topic: str) -> int:
@@ -89,6 +90,7 @@ def cases_from_findings(findings, events, details, *, limit=24, before=10., afte
         signals.sort(key=lambda s:(-priority(finding.code,s.get('field',''),s.get('topic','')),
                                    s.get('topic',''),s.get('field','')))
         state_context = preceding_state_context(anchor, state_transitions or [])
+        comparisons = transition_comparisons(state_context, signals[:8])
         cases.append({
             'id': f'C{idx+1:03d}', 'title': finding.title, 'code':finding.code,
             'severity':finding.severity, 'description':finding.explanation,
@@ -97,6 +99,8 @@ def cases_from_findings(findings, events, details, *, limit=24, before=10., afte
             'evidence_ids':finding.evidence_ids[:12],
             'state_context':state_context,
             'state_summary':summarize_state_context(state_context),
+            'sensor_comparisons': comparisons,
+            'sensor_comparison_summary':summary_for_case(comparisons),
             'events':[{'id':e.event_id,'t':e.timestamp,'code':e.code,
                        'severity':e.severity,'message':e.message[:250]} for e in relevant[:25]],
             'signals':signals[:8], 'paths':paths[:2],
@@ -155,6 +159,7 @@ def workbench_markup(findings, events, details, *, state_transitions=None):
  <span class="case-badge">±10 s evidence · configurable</span></div>
  <div id="case-header"></div>
  <div id="case-states" class="case-state-panel" aria-label="Prior explicit robot state transitions"></div>
+ <div id="case-comparisons" class="case-state-panel" aria-label="Sensor changes around recorded state transitions"></div>
  <div class="case-controls"><label for="case-window">Time window</label><select id="case-window" aria-label="Context window"><option value="5">±5 s</option><option value="10" selected>±10 s</option><option value="30">±30 s</option></select>
  <button type="button" id="case-sync" class="case-event">↗ Sync main time cursor</button></div>
  <div id="case-charts" class="case-chart-grid" aria-label="Contextual multi-sensor graphs"></div>
@@ -175,7 +180,7 @@ def workbench_script():
  const selector=document.getElementById('case-select');if(!selector||!cases.length)return;
  const section=document.getElementById('incident-workbench');
  const header=document.getElementById('case-header'),plots=document.getElementById('case-charts'),events=document.getElementById('case-events');
- const windowSel=document.getElementById('case-window'),states=document.getElementById('case-states');let active=0;
+ const windowSel=document.getElementById('case-window'),states=document.getElementById('case-states'),comparisons=document.getElementById('case-comparisons');let active=0;
  const ns='http://www.w3.org/2000/svg';
  const dom=(tag,cls,content)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(content!==undefined)n.textContent=String(content);return n;};
  function svgNode(p,tag,attrs){const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs||{}))n.setAttribute(k,v);p.appendChild(n);return n;}
@@ -189,10 +194,16 @@ def workbench_script():
  const yy=v=>178-(v-min)/(max-min)*143;
  for(let i=0;i<4;i++){let y=178-i*43;svgNode(svg,'line',{x1:50,y1:y,x2:580,y2:y,stroke:'#2b4358','stroke-dasharray':'3 5'});}
  svgNode(svg,'polyline',{points:points.map(p=>xx(p[0],a,b).toFixed(1)+','+yy(p[1]).toFixed(1)).join(' '),stroke:'#57d5c1','stroke-width':'2.6',fill:'none'});
+ for(const tr of c.sensor_comparisons||[]){if(tr.timestamp<a||tr.timestamp>b)continue;
+   const tx=xx(tr.timestamp,a,b);
+   const line=svgNode(svg,'line',{x1:tx,x2:tx,y1:20,y2:178,stroke:'#7ddcc7','stroke-width':1.4,'stroke-dasharray':'3 5'});
+   const title=svgNode(line,'title',{});title.textContent='Logged state: '+tr.field+' → '+tr.to;
+ }
  let x=xx(c.anchor,a,b);svgNode(svg,'line',{x1:x,x2:x,y1:20,y2:178,stroke:'#ffb264','stroke-width':2,'stroke-dasharray':'5 4'});
  let p=nearest(points,c.anchor);let t=svgNode(svg,'text',{x:50,y:18});t.textContent='±'+half+' s · '+points.length+' sampled points';
  let last=svgNode(svg,'text',{x:50,y:197});last.textContent='Nearest sampled: '+p[1].toFixed(3)+' · Δt '+(p[0]-c.anchor).toFixed(2)+' s';
  let maxGap=Math.abs(p[0]-c.anchor);if(maxGap>2)card.appendChild(dom('p','case-caption','Warning: nearest sample is '+maxGap.toFixed(1)+' s away from event; no interpolation.'));
+ card.appendChild(dom('p','case-caption','Teal dashed: recorded state transition · Orange dashed: finding time.'));
  plots.appendChild(card);
  }
  function drawPath(path,c){let card=dom('div','case-chart-card');card.appendChild(dom('p','case-chart-title','Odometry path · '+path.topic+' · frame '+path.frame));const svg=chartSvg();card.appendChild(svg);
@@ -219,6 +230,7 @@ def workbench_script():
    btn.type='button';btn.addEventListener('click',()=>{window.__riaMoveCursor?.(x.timestamp);document.getElementById('event-'+x.event_id)?.scrollIntoView({behavior:'smooth',block:'center'});});
    line.appendChild(btn);line.appendChild(dom('span','',new Date(x.timestamp*1000).toISOString()+' · Δt '+(x.timestamp-c.anchor).toFixed(1)+' s · '+x.event_id));states.appendChild(line);});}
  
+ window.__riaDrawComparisons?.(comparisons,c.sensor_comparisons,c.sensor_comparison_summary);
  const half=Number(windowSel.value)||10;let signals=c.signals.filter(s=>s.samples.some(p=>Math.abs(p[0]-c.anchor)<=half));
  signals.slice(0,4).forEach(s=>drawScalar(s,c,half));
  if(c.paths.length)drawPath(c.paths[0],c);

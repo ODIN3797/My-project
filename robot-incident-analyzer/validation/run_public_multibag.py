@@ -26,7 +26,7 @@ SOURCES={'experiment1':(ZENODO1,30_000_000),'vigo_navigation':(VIGO,50_000_000),
 def stream_download(url, destination, limit):
     h=hashlib.sha256()
     size=0
-    with urlopen(Request(url,headers={'User-Agent':'RobotIncidentAnalyzer-public-dataset-eval/0.5.1'}),timeout=30) as response, destination.open('wb') as fp:
+    with urlopen(Request(url,headers={'User-Agent':'RobotIncidentAnalyzer-public-dataset-eval/0.5.4'}),timeout=30) as response, destination.open('wb') as fp:
         while True:
             data=response.read(1024*1024)
             if not data: break
@@ -119,8 +119,11 @@ def run(output: Path, *, download=True, input_dir:Path|None=None):
                     probe['decoded_messages']+=1
                     probe['finite_readings']+=int(math.isfinite(decoded['distance']))
                     probe['infinite_readings']+=int(math.isinf(decoded['distance']))
-                except (ValueError,OverflowError,TypeError):
+                except (ValueError,OverflowError,TypeError) as exc:
                     probe['decode_failures']+=1
+                    if 'example_error' not in probe:
+                        probe['example_error'] = type(exc).__name__ + ': ' + str(exc)[:150]
+                        probe['sample_header_hex'] = payload[:16].hex()
         probe['passed']=probe['decoded_messages']>0 and probe['decode_failures']==0
         ledger['public_sonar_payload_regression']=probe
         print('Independent ROS2 Range sonar decoded:',probe)

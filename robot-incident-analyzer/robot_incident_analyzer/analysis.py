@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections import Counter, defaultdict
+import re
 from .models import Event, Finding
 
 
@@ -8,6 +9,23 @@ def same_robot_or_source(a: Event, b: Event) -> bool:
     if a.robot_id == 'unknown' or b.robot_id == 'unknown':
         return a.robot_id == b.robot_id == 'unknown' and a.source == b.source
     return a.robot_id == b.robot_id
+
+
+def recurring_alert_key(event: Event) -> tuple[str, str, str]:
+    """Group generic ROS logs by message template, not just ROS_LOG event code.
+
+    This heuristic replaces changing numbers with a placeholder and preserves
+    the rest of the message. Distinct warnings from different nodes or about
+    different conditions must not be merged into a false recurring incident.
+    """
+    robot_key = event.robot_id if event.robot_id != 'unknown' else 'source:' + event.source
+    if event.code != 'ROS_LOG':
+        return robot_key, event.code, ''
+    message = event.message.strip().casefold()
+    # Numeric variations (e.g. 3.1 m vs 3.0 m) should not split true repeats.
+    message = re.sub(r'(?<![\w])[-+]?\d+(?:\.\d+)?(?![\w])', '<n>', message)
+    message = ' '.join(message.split())
+    return robot_key, event.code, message[:240]
 
 
 def build_findings(events: list[Event]) -> list[Finding]:
@@ -43,12 +61,12 @@ def build_findings(events: list[Event]) -> list[Finding]:
                                       'Inspect contact alignment and charging handshake state.'],
                     evidence_ids=[earlier[-1].event_id, event.event_id]))
 
-    groups: dict[tuple[str,str], list[Event]] = defaultdict(list)
+    groups: dict[tuple[str,str,str], list[Event]] = defaultdict(list)
     for event in events:
         if event.severity in ('WARN', 'ERROR', 'FATAL'):
-            groups[(event.robot_id if event.robot_id != 'unknown' else 'source:' + event.source, event.code)].append(event)
+            groups[recurring_alert_key(event)].append(event)
 
-    for (robot_id, code), grouped in groups.items():
+    for (robot_id, code, _fingerprint), grouped in groups.items():
         if len(grouped) >= 3 and grouped[-1].timestamp - grouped[0].timestamp <= 600:
             findings.append(Finding(
                 code='RECURRING_ALERT', title=f'Repeated {code} alerts', severity='MEDIUM',

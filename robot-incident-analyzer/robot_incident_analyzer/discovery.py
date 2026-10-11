@@ -76,11 +76,16 @@ def discover(topics: dict[str, str], overrides: dict[str, str] | None = None,
                 result.warnings.append(f'Manual mapping {role}={name!r} has incompatible type {topics[name]}; role not analyzed')
             else:
                 result.selected[role] = name
+                if role == 'command' and role_score(role,name)<14:
+                    result.warnings.append(f'command: manually mapped {name!r} has no command-like topic name; verify it is an actuation command, not a velocity estimate')
             continue
         if len(options) == 1:
-            result.selected[role] = options[0]['topic']
-            if options[0]['name_score'] == 0:
-                result.warnings.append(f'{role}: selected sole type-compatible stream {options[0]["topic"]}; validate its semantic role')
+            if role == 'command' and options[0]['name_score'] < 14:
+                result.warnings.append(f'command: only type-compatible stream {options[0]["topic"]} lacks command-like name; not automatically mapped. Supply an explicit verified topic mapping if it is an actual actuation command')
+            else:
+                result.selected[role] = options[0]['topic']
+                if options[0]['name_score'] == 0:
+                    result.warnings.append(f'{role}: selected sole type-compatible stream {options[0]["topic"]}; validate its semantic role')
         elif len(options) > 1:
             first,second=options[:2]
             if first['name_score'] >= 14 and first['name_score']-second['name_score'] >= 8:

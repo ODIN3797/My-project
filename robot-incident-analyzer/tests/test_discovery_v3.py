@@ -13,6 +13,16 @@ from robot_incident_analyzer.telemetry import validate_thresholds
 
 
 class DiscoveryV3Tests(unittest.TestCase):
+    def test_vigo_gps_twist_not_inferred_as_motor_command(self):
+        topics={'/rpsc4/global_position/raw/gps_vel':'geometry_msgs/msg/TwistStamped',
+                '/rpsc4/global_position/local':'nav_msgs/msg/Odometry'}
+        d=discover(topics)
+        self.assertNotIn('command',d.selected)
+        self.assertTrue(any('not automatically mapped' in w for w in d.warnings))
+        d_manual=discover(topics,{'command':'/rpsc4/global_position/raw/gps_vel'})
+        self.assertIn('command',d_manual.selected)
+        self.assertTrue(any('verify it is an actuation command' in w for w in d_manual.warnings))
+
     def test_namespaced_alias_type_first(self):
         topics={'/robot1/navifra/control/velocity_cmd':'geometry_msgs/msg/Twist',
                 '/robot1/wheel/odom':'nav_msgs/msg/Odometry',

@@ -136,7 +136,14 @@ def run(output: Path, *, download=True, input_dir:Path|None=None):
                     'topic_count':x['topic_count'],'event_count':x['event_count'],
                     'finding_count':x['finding_count'], 'event_codes':x['event_codes'],
                     'status':x['status'], 'review_flags':x['review_flags'],
-                    'warning_count':len(x.get('warnings',[]))} for x in field['cases']]
+                    'warning_count':len(x.get('warnings',[])),
+                    'topic_mappings':x.get('topic_mappings',[])} for x in field['cases']]
+                if name=='vigo_navigation':
+                    wrong=[{'file':x['name'],'mapping':m.get('command')} for x in rec['deep_analysis']
+                           for m in x.get('topic_mappings',[]) if 'gps_vel' in (m.get('command') or '')]
+                    ledger['vigo_command_semantic_safety']={'passed':not wrong,
+                        'improper_velocity_as_command_mappings':wrong,
+                        'note':'GPS velocity measurement must not auto-map as actuation command'}
                 print(name,': full event analysis',len(rec['deep_analysis']), 'bag(s)')
             else:
                 rec['full_analysis_error']=(result.stderr[-1500:]+' '+result.stdout[-1500:])[:2600]
@@ -201,5 +208,6 @@ if __name__=='__main__':
     # Vigo multi-run dataset downloaded, and BAGEL MCAP was interpreted.
     good=(r.get('experiment1_rate_regression',{}).get('verified') is True and
           r.get('vigo_reference_analysis',{}).get('compared',0)>=2 and
+          r.get('vigo_command_semantic_safety',{}).get('passed') is True and
           r.get('recording_sources',{}).get('bagel_example',{}).get('single_analysis_return_code') in (0,3))
     raise SystemExit(0 if good else 1)

@@ -47,3 +47,9 @@ The downstream **8.32x observed mean rate increase** is a reproducible compariso
 2. Compare real robot work phases, frame continuity, rate expectations and known controller modes.
 3. Report confidence and provenance and always permit a human to inspect raw message graphs.
 4. Users of third-party datasets must follow the original dataset usage, license and privacy requirements.
+
+## Field-data-discovered semantic mapping guard
+
+The University of Vigo bag includes `/rpsc4/global_position/raw/gps_vel` with a velocity-compatible message type. An earlier version of topic auto-discovery **mistook this GPS velocity estimate for an actuation command**, merely because it was the only matching message type. The analyzer now requires an explicit command-like topic name (such as `cmd_vel`, `velocity_cmd`) before mapping a sole standard Twist/TwistStamped topic as `command`; otherwise the operator must explicitly supply and verify an override. This prevents false command/odometry mismatch evidence in the Vigo dataset.
+
+The real-data CI suite asserts that GPS velocity cannot be assigned to the command role. A manually overridden non-command-looking topic is allowed only with an explicit semantic warning.

@@ -98,6 +98,34 @@ def run(output: Path, *, download=True, input_dir:Path|None=None):
     ex=source('experiment1',*SOURCES['experiment1'])
     vi=source('vigo_navigation',*SOURCES['vigo_navigation'])
     bg=source('bagel_example',*SOURCES['bagel_example'])
+    # Independent source-recording payload compatibility regression for sonar.
+    # This checks actual CDR bytes, not only the message-type name in metadata.
+    if ex:
+        from robot_incident_analyzer.bag_reader import read_bag
+        from robot_incident_analyzer.telemetry import decode_standard
+        probe={'source':'Zenodo Experiment_1 ROS2 sonar','type':'sensor_msgs/msg/Range',
+               'decoded_messages':0,'decode_failures':0,'finite_readings':0,
+               'infinite_readings':0}
+        import math
+        for sample in ex[:2]:
+            n=0
+            for topic, typ, timestamp, payload in read_bag(sample, 200000, []):
+                if typ.replace('/msg/','/')!='sensor_msgs/Range':
+                    continue
+                if n >= 128: break
+                n+=1
+                try:
+                    decoded=decode_standard(typ,payload)
+                    probe['decoded_messages']+=1
+                    probe['finite_readings']+=int(math.isfinite(decoded['distance']))
+                    probe['infinite_readings']+=int(math.isinf(decoded['distance']))
+                except (ValueError,OverflowError,TypeError):
+                    probe['decode_failures']+=1
+        probe['passed']=probe['decoded_messages']>0 and probe['decode_failures']==0
+        ledger['public_sonar_payload_regression']=probe
+        print('Independent ROS2 Range sonar decoded:',probe)
+        if not probe['passed']:
+            raise RuntimeError('Published ROS2 sonar Range CDR regression failed')
     for name, paths in [('experiment1',ex),('vigo_navigation',vi),('bagel_example',bg)]:
         rec=ledger['recording_sources'][name]
         if not paths: continue

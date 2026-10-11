@@ -1,3 +1,16 @@
+## New in v0.5.4: MAVROS/Range + dual-independent-reviewer evidence
+
+Published MAVROS State/ExtendedState/StatusText and ROS2 sonar Range CDR payloads now have bounded, offline decoding; MAVROS status changes are observations, not diagnoses. Range +/-Infinity is not treated as a sensor failure.
+
+```bash
+python3 -m robot_incident_analyzer compare-reviewers rate_timeline.json reviewer_A.json reviewer_B.json --output reviewer_comparison
+xdg-open reviewer_comparison/reviewer_comparison.html
+```
+
+Two **different reviewed** annotators must label the **same SHA-256 bag and exact topic/type**. The report shows overlapping-review agreement, Cohen's kappa (when defined), manual adjudication intervals and single-reviewer coverage. It **never creates an automatic ground-truth consensus**. [Korean guide](docs/MAVROS_REVIEW_V054_KR.md), [English guide](docs/MAVROS_REVIEW_V054_EN.md).
+
+---
+
 ## New in v0.5.3: reviewable detection metrics
 
 Offline labeling and scoring for **recorded message-rate episodes** only (not all robot faults):

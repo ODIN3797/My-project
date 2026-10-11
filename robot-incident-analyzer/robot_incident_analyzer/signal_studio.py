@@ -110,6 +110,15 @@ def standard_fields(canonical, decoded):
         if decoded.get('position') is not None:
             fields.update({'position.x (m)':decoded['position'][0], 'position.y (m)':decoded['position'][1]})
         return fields
+    if canonical == 'sensor_msgs/Range':
+        return {'range (m)': decoded['distance'], 'field_of_view (rad)':decoded['field_of_view']}
+    if canonical == 'mavros_msgs/State':
+        return {'connected (0/1)':int(decoded['connected']), 'armed (0/1)':int(decoded['armed']),
+                'guided (0/1)':int(decoded['guided']), 'system_status':decoded['system_status']}
+    if canonical == 'mavros_msgs/ExtendedState':
+        return {'vtol_state': decoded['vtol_state'], 'landed_state': decoded['landed_state']}
+    if canonical == 'mavros_msgs/StatusText':
+        return {'severity': decoded['severity']}
     if canonical == 'sensor_msgs/BatteryState':
         return {'voltage (V)': decoded['voltage'], 'current (A)':decoded['current'],
                 'percentage (%)':decoded['percentage'] * 100, 'temperature (°C)':decoded['temperature']}

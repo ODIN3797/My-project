@@ -95,6 +95,11 @@ def main(argv: list[str] | None = None) -> int:
     score.add_argument('rate_report',type=Path,help='output of inspect-rates: rate_timeline.json')
     score.add_argument('labels',type=Path,help='human-reviewed interval JSON, same bag SHA256')
     score.add_argument('--output',type=Path,default=Path('rate_evaluation'))
+    reviewers=sub.add_parser('compare-reviewers',help='compare two independent reviewed-interval label files; disagreements remain unadjudicated')
+    reviewers.add_argument('rate_report',type=Path)
+    reviewers.add_argument('reviewer_a',type=Path)
+    reviewers.add_argument('reviewer_b',type=Path)
+    reviewers.add_argument('--output',type=Path,default=Path('reviewer_comparison'))
     gui=sub.add_parser('gui',help='local-only browser UI with drag-and-drop upload')
     gui.add_argument('--port',type=int,default=8765)
     gui.add_argument('--output',type=Path,default=Path('output_gui'))
@@ -163,6 +168,12 @@ def main(argv: list[str] | None = None) -> int:
             result=write_evaluation(args.rate_report,args.labels,args.output)
             print(f"Labelled recall: {result['positive_recall']} | False alarms/reviewed hour: {result['false_alarms_per_hour']}")
             print(f'HTML: {args.output / "evaluation.html"}\nJSON: {args.output / "evaluation.json"}')
+            return 0
+        if args.command=='compare-reviewers':
+            from .review_agreement import write_reviewer_comparison
+            result=write_reviewer_comparison(args.rate_report,args.reviewer_a,args.reviewer_b,args.output)
+            print(f"Joint reviewed: {result['jointly_reviewed_seconds']} s; agreement: {result['agreement_fraction']}; disagreements: {result['disagreement_interval_count']}")
+            print(f'HTML: {args.output / "reviewer_comparison.html"}\nJSON: {args.output / "reviewer_comparison.json"}')
             return 0
         if args.command=='gui':
             from .gui import run_gui

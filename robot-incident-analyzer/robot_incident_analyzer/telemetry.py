@@ -74,10 +74,32 @@ def decode_standard(msgtype: str, payload: bytes) -> Any:
         'geometry_msgs/Twist', 'geometry_msgs/TwistStamped', 'nav_msgs/Odometry',
         'tf2_msgs/TFMessage', 'diagnostic_msgs/DiagnosticArray',
         'sensor_msgs/BatteryState', 'sensor_msgs/Imu', 'sensor_msgs/LaserScan',
+        'sensor_msgs/Range', 'mavros_msgs/State', 'mavros_msgs/ExtendedState',
+        'mavros_msgs/StatusText',
     )
     if msgtype not in supported:
         return None
     c = CDR(payload)
+    if msgtype == 'sensor_msgs/Range':
+        _, frame = c.header()
+        radiation_type = c.read('B', 1)
+        field_of_view, min_range, max_range, distance, variance = (c.read('f', 4) for _ in range(5))
+        return {'frame': frame, 'radiation_type': radiation_type,
+                'field_of_view': field_of_view, 'min_range': min_range, 'max_range': max_range,
+                'distance': distance, 'variance': variance}
+    if msgtype == 'mavros_msgs/State':
+        c.header()
+        connected, armed, guided, manual_input = (bool(c.read('?', 1)) for _ in range(4))
+        mode = c.string()
+        status = c.read('B', 1)
+        return {'connected': connected, 'armed': armed, 'guided': guided,
+                'manual_input': manual_input, 'mode': mode, 'system_status': status}
+    if msgtype == 'mavros_msgs/ExtendedState':
+        c.header()
+        return {'vtol_state': c.read('B', 1), 'landed_state': c.read('B', 1)}
+    if msgtype == 'mavros_msgs/StatusText':
+        c.header()
+        return {'severity': c.read('B', 1), 'text': c.string()}
     if msgtype == 'geometry_msgs/Twist':
         return c.twist()
     if msgtype == 'geometry_msgs/TwistStamped':
@@ -217,6 +239,9 @@ class TelemetryAnalyzer:
         self.last_battery_low = {}
         self.last_imu_invalid = {}
         self.last_scan_metadata_invalid = {}
+        self.last_mavros_state = {}
+        self.last_mavros_ext_state = {}
+        self.last_mavros_status_text = {}
         self.nan_scan_streak = defaultdict(int)
         self.scan_nan_alert_active = set()
         self.cmd_streams = defaultdict(list)
@@ -239,7 +264,9 @@ class TelemetryAnalyzer:
         self.topics[topic] = msgtype
         standard = {'geometry_msgs/Twist', 'geometry_msgs/TwistStamped', 'nav_msgs/Odometry',
                     'tf2_msgs/TFMessage', 'diagnostic_msgs/DiagnosticArray',
-                    'sensor_msgs/BatteryState', 'sensor_msgs/Imu', 'sensor_msgs/LaserScan'}
+                    'sensor_msgs/BatteryState', 'sensor_msgs/Imu', 'sensor_msgs/LaserScan',
+                    'sensor_msgs/Range', 'mavros_msgs/State', 'mavros_msgs/ExtendedState',
+                    'mavros_msgs/StatusText'}
         custom = canonical in self.custom_roles and canonical not in standard
         schema_only = bool(self.schema_registry and canonical in self.schema_registry.definitions
                            and canonical not in standard and not custom)
@@ -266,6 +293,47 @@ class TelemetryAnalyzer:
                 self.signal_sampler.position(topic, decoded.get('frame', 'custom_local'), ts, decoded.get('position'))
         except (ValueError, struct.error, OverflowError, RecursionError):
             self.decode_failures += 1
+            return
+        if canonical == 'sensor_msgs/Range':
+            # REP-117: +/-inf are intentional fixed-range/no-return indicators,
+            # never evidence of sensor failure without further corroboration.
+            return
+        if canonical == 'mavros_msgs/State':
+            # Only explicit FCU-reported state. This is not an autonomous fault
+            # classifier. Observe mode/armed/connectivity changes, not causes.
+            state = (decoded['connected'], decoded['armed'], decoded['guided'],
+                     decoded['manual_input'], decoded['mode'], decoded['system_status'])
+            previous = self.last_mavros_state.get(topic)
+            if previous is not None and previous != state:
+                fields = ('connected', 'armed', 'guided', 'manual_input', 'mode', 'system_status')
+                differences = [f'{name}: {old!r} -> {new!r}' for name, old, new in zip(fields,previous,state) if old != new]
+                self.emit(ts, 'MAVROS_STATE_CHANGE',
+                          f'{topic}: FCU-published state change: {"; ".join(differences)}. '
+                          'A state message is not proof of actuation or fault root cause.', topic, 'INFO')
+            self.last_mavros_state[topic] = state
+            return
+        if canonical == 'mavros_msgs/ExtendedState':
+            state = (decoded['vtol_state'], decoded['landed_state'])
+            previous = self.last_mavros_ext_state.get(topic)
+            if previous is not None and previous != state:
+                self.emit(ts, 'MAVROS_EXTENDED_STATE_CHANGE',
+                          f'{topic}: FCU-published extended-state update from {previous!r} to {state!r}; '
+                          'review vehicle context before inferring a failure.', topic, 'INFO')
+            self.last_mavros_ext_state[topic] = state
+            return
+        if canonical == 'mavros_msgs/StatusText':
+            # Distinct MAVLink severity codes: 0 emergency ... 7 debug.
+            severity_code = decoded['severity']
+            if 0 <= severity_code <= 4:
+                key = (severity_code, decoded['text'])
+                if self.last_mavros_status_text.get(topic) != key:
+                    self.emit(ts, 'MAVROS_STATUS_TEXT',
+                              f'{topic}: MAVLink STATUSTEXT severity={severity_code}, '
+                              f'text={decoded["text"][:320]!r} (publisher report, unverified).',
+                              topic, 'ERROR' if severity_code <= 3 else 'WARN')
+                self.last_mavros_status_text[topic] = key
+            else:
+                self.last_mavros_status_text.pop(topic, None)
             return
         if canonical == 'sensor_msgs/LaserScan':
             invalid_meta = (not all(math.isfinite(decoded[k]) for k in

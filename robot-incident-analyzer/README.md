@@ -1,3 +1,51 @@
+# Robot Incident Analyzer v0.4.8 — Incident Workbench
+
+**Offline ROS2 incident triage, synchronized evidence charts, source-scoped odometry position markers, and optional local PDF export.**
+
+This is an experimental diagnostic *aid*, not a validated root-cause detector. Time-aligned telemetry and nearby ROS logs are **not proof of causation**. It never uploads your recording to a server.
+
+## What's new
+
+- **Incident Workbench:** Choose a finding or click an “Investigate” button from a finding or the event table; select ±5, ±10 or ±30 seconds of context.
+- Automatically ranks relevant numeric signals (up to four visible plots) using the finding code and names of *decoded* numeric fields. It never infers that a nearby reading caused the incident.
+- Groups nearby observations by the **recording source** and avoids blending clearly different `/robotX`, `/agvX`, and `/amrX` namespaces when the robot ID is known.
+- Displays the **estimated event position** on an odometry XY path only if a sampled position is within two seconds of the event. This is not global/map ground truth.
+- **PDF export:** the report contains a browser “Print / Save as PDF” action. CLI `analyze ... --pdf` creates `report.pdf` with a cover, evidence, charts and a path for each finding. The CLI PDF option requires the optional `reportlab` package.
+- JSON + HTML remain available without third-party Python dependencies. All plots work offline without CDN or JavaScript libraries.
+
+## Reproducible demo
+
+```bash
+python3 -m robot_incident_analyzer demo-studio --output studio_data
+python3 -m robot_incident_analyzer analyze studio_data/fictional_signal_studio.mcap --output output
+# output/report.html + output/report.json
+xdg-open output/report.html
+```
+
+For a locally generated **PDF**:
+
+```bash
+python3 -m pip install '.[pdf]'    # or: python3 -m pip install reportlab
+python3 -m robot_incident_analyzer analyze \
+    studio_data/fictional_signal_studio.mcap --output output --pdf
+# output/report.pdf
+```
+
+`--pdf` does not invoke a cloud service. If ReportLab is not installed, the HTML report's print control works with any browser offering “Save as PDF.”
+
+## Known limits
+
+- Standard XCDR1 and configured custom `.msg` types only; arbitrary vendor types and XCDR2 are not necessarily decoded.
+- Signal previews are downsampled; nearest recorded samples are labeled and never interpolated as truth.
+- Multi-robot source identification may be ambiguous if upstream logs omit robot identifiers and namespaces.
+- Real physical robot incident precision and recall are **not measured**; synthetic tests are not a diagnostic accuracy benchmark.
+- Up to 24 evidence-linked workbench cases (full results preserved in `report.json`); default bag read limit 200,000 messages.
+- PDF export includes the first 20 cases and up to two signal charts per case; HTML offers richer interaction.
+
+See [Incident Workbench guide](docs/INCIDENT_WORKBENCH_V048_EN.md).
+
+---
+
 # Robot Incident Analyzer v0.4.7 — Signal Studio
 
 **ROS2 offline incident investigation and synchronized graphs (experimental alpha).**

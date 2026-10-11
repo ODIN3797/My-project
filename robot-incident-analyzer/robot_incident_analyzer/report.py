@@ -8,6 +8,7 @@ from .models import Event, Finding, TopicStats, utc_iso
 from . import __version__
 from .dashboard import DASHBOARD_CSS, density_timeline, top_sources, topic_volume, topic_timing_variation, dashboard_script
 from .signal_studio import STUDIO_CSS, studio_markup, studio_script
+from .incident_workbench import WORKBENCH_CSS, workbench_markup, workbench_script, cases_from_findings
 
 STYLE = '''
 :root{color-scheme:dark;--bg:#0b1120;--panel:#111d30;--border:#25344b;--fg:#e7edf7;--muted:#9aaac0;--accent:#7fd1cf;--warn:#f5c46b;--error:#fa9097}
@@ -133,6 +134,8 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
         f'<span class="kpi-label">{esc(label)}</span></div>'
         for value, label in metrics)
 
+    cases = cases_from_findings(findings, events, details)
+    case_lookup = {(case["code"], case["evidence_ids"][0]): idx for idx, case in enumerate(cases) if case["evidence_ids"]}
     # Navigable event evidence never silently vanishes due to filters.
     evidence_visible = {e.event_id for e in display_events}
     finding_cards = []
@@ -145,27 +148,37 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
              f'↗ {esc(eid)}</a>' if eid in evidence_visible else
              f'<span class="evidence-link" title="Evidence in JSON export">{esc(eid)} · JSON</span>')
             for eid in f.evidence_ids[:6])
+        inspect_index = case_lookup.get((f.code, f.evidence_ids[0]), None) if f.evidence_ids else None
+        inspect_button = (f'<button type="button" class="case-event" data-inspect-case="{inspect_index}">Inspect synchronized evidence ↗</button>' if inspect_index is not None else '')
         finding_cards.append(
             f'<article class="investigation-card {tone}"><div class="finding-head">'
             f'<h3>{esc(f.title)}</h3><span class="severity-pill {tone}">{esc(f.severity)}</span>'
             f'</div><p>{esc(f.explanation)}</p><div class="aux-text">Evidence: {esc(f.confidence)}</div>'
-            f'<ol>{checks}</ol><div>{evidence}</div></article>')
+            f'<ol>{checks}</ol><div>{evidence}</div>{inspect_button}</article>')
     if not finding_cards:
         finding_cards=['<p class="empty">No configured investigation rules matched. This is not proof of robot health.</p>']
     if len(findings) > 30:
         finding_cards.append(f'<p class="aux-text">Showing 30 of {len(findings):,} findings. Full list: report.json.</p>')
 
     # Event table filtering is client-side and never alters original report.json.
-    event_html=''.join(
-        f'<tr id="event-{esc(e.event_id)}" data-ts="{e.timestamp:.9f}" data-severity="{esc(e.severity)}">'
-        f'<td><a href="#event-{esc(e.event_id)}">{esc(e.event_id)}</a></td>'
-        f'<td>{esc(utc_iso(e.timestamp))}</td>'
-        f'<td class="status-{esc(e.severity.lower())}">{esc(e.severity)}</td>'
-        f'<td><code>{esc(e.code)}</code></td><td>{esc(e.message)}</td>'
-        f'<td>{esc(e.source)}</td></tr>' for e in display_events)
+    event_case_lookup = {eid: idx for idx, c in enumerate(cases) for eid in c['evidence_ids']}
+    def event_row(e):
+        inspect = (f'<button type="button" class="filter-chip" '
+                   f'data-event-inspect="{esc(e.event_id)}">Investigate ↗</button>'
+                   if e.event_id in event_case_lookup else '—')
+        return (
+            f'<tr id="event-{esc(e.event_id)}" data-ts="{e.timestamp:.9f}" '
+            f'data-severity="{esc(e.severity)}">'
+            f'<td><a href="#event-{esc(e.event_id)}">{esc(e.event_id)}</a></td>'
+            f'<td>{esc(utc_iso(e.timestamp))}</td>'
+            f'<td class="status-{esc(e.severity.lower())}">{esc(e.severity)}</td>'
+            f'<td><code>{esc(e.code)}</code></td><td>{esc(e.message)}</td>'
+            f'<td>{esc(e.source)}</td><td>{inspect}</td></tr>'
+        )
+    event_html = ''.join(event_row(e) for e in display_events)
     table = ('<div class="table-scroll"><table id="events-table" class="report-table">'
              '<thead><tr><th>ID</th><th>UTC timestamp</th><th>Level</th><th>Code</th>'
-             '<th>Evidence / observation</th><th>Input</th></tr></thead><tbody>'
+             '<th>Evidence / observation</th><th>Input</th><th>Action</th></tr></thead><tbody>'
              + event_html + '</tbody></table></div>')
     topic_rows=''.join(
         f'<tr><td><code>{esc(st.topic)}</code><div class="aux-text">{esc(st.message_type)}</div></td>'
@@ -195,7 +208,7 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
     event_window=(f'{utc_iso(min(e.timestamp for e in events))} — {utc_iso(max(e.timestamp for e in events))}'
                   if events else 'No events')
     file_names=', '.join(p.name for p in input_files)
-    css = STYLE + '\n' + DASHBOARD_CSS + '\n' + STUDIO_CSS
+    css = STYLE + '\n' + DASHBOARD_CSS + '\n' + STUDIO_CSS + '\n' + WORKBENCH_CSS
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Robot Incident Analyzer | Incident Overview</title><style>{css}</style></head>
@@ -205,9 +218,10 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
  <nav aria-label="Sections"><p class="nav-heading">INVESTIGATE</p>
   <a class="nav-link" href="#overview"><span class="nav-num">01</span> Overview</a>
   <a class="nav-link" href="#findings"><span class="nav-num">02</span> Findings</a>
-  <a class="nav-link" href="#signals"><span class="nav-num">03</span> Signals</a>
-  <a class="nav-link" href="#timeline"><span class="nav-num">04</span> Event log</a>
-  <a class="nav-link" href="#topics"><span class="nav-num">05</span> Topic coverage</a>
+  <a class="nav-link" href="#incident-workbench"><span class="nav-num">03</span> Workbench</a>
+  <a class="nav-link" href="#signals"><span class="nav-num">04</span> Signals</a>
+  <a class="nav-link" href="#timeline"><span class="nav-num">05</span> Event log</a>
+  <a class="nav-link" href="#topics"><span class="nav-num">06</span> Topic coverage</a>
  </nav>
  <div class="rail-bottom"><strong>Offline by design</strong><br>No files uploaded to external servers. No AI API. Correlation ≠ causation.<br><br>Experimental diagnostics only.</div>
 </aside>
@@ -227,6 +241,7 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
 </div></section>
 <section id="findings" aria-labelledby="findings-title"><div class="section-head"><div><h2 id="findings-title">Investigation queue</h2><p>Evidence-backed observations with concrete follow-up checks, not AI-generated certainty.</p></div><span class="pill-inline">{high} high priority</span></div>
 <div class="findings-grid">{''.join(finding_cards)}</div></section>
+{workbench_markup(findings, events, details)}
 <section id="signals" aria-labelledby="signals-title"><div class="section-head"><div><h2 id="signals-title">Velocity comparison · Signal explorer</h2><p>Aligned command/odometry speeds and expandable anomaly windows where both streams exist.</p></div></div>
 {studio_markup(details, events)}
 {''.join(plots) if plots else '<div class="box-card empty">No unambiguous command / odometry pair recorded. Inspect topic mapping and coverage below.</div>'}
@@ -249,7 +264,7 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
 <li>Event table displays at most 2,000 records; full results are in report.json.</li>{warnings_html}</ul></div>
 </section>
 <footer class="topic-caption" style="margin-top:30px">Robot Incident Analyzer · Generated locally · Research prototype. Review data before sharing reports.</footer>
-</main></div>{dashboard_script()}{studio_script()}</body></html>'''
+</main></div>{dashboard_script()}{studio_script()}{workbench_script()}</body></html>'''
 
 
 def save_report(output_dir: Path, events: list[Event], findings: list[Finding],

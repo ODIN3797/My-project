@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "robot-incident-analyzer"
-version = "0.4.7"
+version = "0.4.8"
 description = "Offline evidence-first incident reports for ROS2 MCAP, DB3 and robot event CSV logs"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,6 +13,7 @@ authors = [{name = "Robot Incident Analyzer contributors"}]
 
 [project.optional-dependencies]
 full = ["rosbags>=0.11,<0.12", "zstandard>=0.22", "lz4>=4"]
+pdf = ["reportlab>=4,<5"]
 
 [project.scripts]
 robot-incident-analyzer = "robot_incident_analyzer.__main__:main"

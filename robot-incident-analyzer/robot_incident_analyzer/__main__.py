@@ -56,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     analyze.add_argument('--output',default='output',type=Path)
     analyze.add_argument('--config',type=Path,help='optional JSON topic overrides and thresholds')
     analyze.add_argument('--max-messages',type=int,default=200000)
+    analyze.add_argument('--pdf',action='store_true',help='create offline PDF report (optional reportlab package)')
     field=sub.add_parser('field-validate', help='offline compatibility and labelled-incident acceptance on external bags')
     field.add_argument('inputs', nargs='+', type=Path, help='local MCAP/DB3 recordings')
     field.add_argument('--output', default='field_results', type=Path)
@@ -107,6 +108,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f'Potential findings: {len(findings)} (not confirmed root causes)')
         for detail in details:
             print(f'Auto discovery ({detail["source"]}): {detail["discovery"]["selected"]}')
+        if args.pdf:
+            from .pdf_export import export_pdf
+            export_pdf(args.output / "report.pdf",events,findings,stats,warnings,paths,details)
+            print(f'PDF: {args.output / "report.pdf"}')
         print(f'HTML: {args.output / "report.html"}\nJSON: {args.output / "report.json"}')
         if warnings:
             for warning in warnings: print(f'WARNING: {warning}',file=sys.stderr)

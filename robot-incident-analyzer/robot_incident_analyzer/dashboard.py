@@ -9,6 +9,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 import html
 import math
+import re
 
 from .models import Event, Finding, TopicStats, utc_iso
 
@@ -141,7 +142,7 @@ def density_timeline(events: list[Event], bins: int = 40) -> str:
 
 
 def top_sources(events: list[Event]) -> str:
-    counts=Counter(e.source or 'Unknown' for e in events)
+    counts=Counter(re.sub(r':row\d+$', '', e.source or 'Unknown') for e in events)
     if not counts:return '<p class="empty">No event sources observed.</p>'
     mx=max(counts.values())
     return '<div class="signal-grid">'+''.join(

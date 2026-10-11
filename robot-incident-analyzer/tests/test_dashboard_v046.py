@@ -42,6 +42,12 @@ class DashboardV046Tests(unittest.TestCase):
         self.assertNotIn('<script>alert(1)</script>',h)
         self.assertIn('&lt;script&gt;',h)
 
+    def test_csv_rows_are_grouped_as_one_input_file(self):
+        h=top_sources([ev(100,src='session.csv:row2'),ev(101,src='session.csv:row3')])
+        self.assertIn('session.csv',h)
+        self.assertNotIn('session.csv:row2',h)
+        self.assertIn('<b>2</b>',h)
+
     def test_topic_gap_chart_is_not_automatic_fault_scoring(self):
         stat=TopicStats(topic='/scan',message_type='sensor_msgs/msg/LaserScan',count=100,
                         duration_s=10,approx_hz=10,median_gap_ms=100,max_gap_ms=800)

@@ -23,3 +23,5 @@ xdg-open reviewers_out/reviewer_comparison.html
 ## 검증 단계
 
 공개 Zenodo 주행 기록 2개에 포함된 sonar `Range` CDR 페이로드 호환성 검사를 GitHub Actions로 수행합니다. 성공 여부와 수집 메시지 수는 실행 결과를 통해 별도로 확인해야 합니다.
+
+- ROS2 `sensor_msgs/Range` has a **schema-version difference**: Foxy/Humble terminate after `range`, while Jazzy/Rolling add `variance`. v0.5.4 accepts exactly these two recognized CDR layouts without inventing a variance value.

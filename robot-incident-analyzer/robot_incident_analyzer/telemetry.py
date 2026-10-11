@@ -83,7 +83,16 @@ def decode_standard(msgtype: str, payload: bytes) -> Any:
     if msgtype == 'sensor_msgs/Range':
         _, frame = c.header()
         radiation_type = c.read('B', 1)
-        field_of_view, min_range, max_range, distance, variance = (c.read('f', 4) for _ in range(5))
+        # Foxy/Humble schema ends at 'range'; Jazzy/Rolling append 'variance'.
+        # A filename/type label is NOT enough to identify the schema version.
+        field_of_view, min_range, max_range, distance = (c.read('f', 4) for _ in range(4))
+        remaining = len(c.data) - c.pos
+        if remaining == 0:
+            variance = None  # absent on Foxy/Humble (not zero)
+        elif remaining == 4:
+            variance = c.read('f', 4)
+        else:
+            raise ValueError('Unsupported/truncated ROS2 Range payload length')
         return {'frame': frame, 'radiation_type': radiation_type,
                 'field_of_view': field_of_view, 'min_range': min_range, 'max_range': max_range,
                 'distance': distance, 'variance': variance}

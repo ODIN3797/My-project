@@ -39,9 +39,9 @@ def status(severity=4, message='Radio link lost'):
     return CDRWriter().header().put('B', severity).text(message).finish()
 
 
-def rng(distance=float('inf'), min_dist=0.1, max_dist=2.5):
+def rng(distance=float('inf'), min_dist=0.1, max_dist=2.5, *, humble=False):
     c = CDRWriter().header().put('B', 0)
-    for x in (0.26, min_dist, max_dist, distance, 0.0):
+    for x in ((0.26, min_dist, max_dist, distance) if humble else (0.26, min_dist, max_dist, distance, 0.0)):
         c.put('f', x)
     return c.finish()
 
@@ -63,11 +63,16 @@ class MavrosCDRTests(unittest.TestCase):
         for d in (float('inf'), -float('inf')):
             self.assertTrue(math.isinf(decode_standard('sensor_msgs/msg/Range',rng(d))['distance']))
 
+    def test_humble_range_schema_without_variance(self):
+        got=decode_standard('sensor_msgs/msg/Range',rng(1.23, humble=True))
+        self.assertIsNone(got['variance'])
+        self.assertAlmostEqual(got['distance'],1.23,places=5)
+
     def test_truncated_message_is_rejected(self):
         for t, b in [('mavros_msgs/msg/State',state()),
                      ('mavros_msgs/msg/ExtendedState',ext()),
                      ('mavros_msgs/msg/StatusText',status()),
-                     ('sensor_msgs/msg/Range',rng())]:
+                     ('sensor_msgs/msg/Range',rng(humble=True))]:
             with self.subTest(t=t), self.assertRaises(ValueError):
                 decode_standard(t, b[:-2])
 
@@ -133,7 +138,7 @@ class ROS2BagIntegrationTests(unittest.TestCase):
             ('/robot_a/mavros/extended_state','mavros_msgs/msg/ExtendedState',ext(3,1)),
             ('/robot_a/mavros/extended_state','mavros_msgs/msg/ExtendedState',ext(3,2)),
             ('/robot_a/mavros/statustext','mavros_msgs/msg/StatusText',status(3,'GPS failsafe')),
-            ('/robot_a/sonar','sensor_msgs/msg/Range',rng(float('inf'))),
+            ('/robot_a/sonar','sensor_msgs/msg/Range',rng(float('inf'), humble=True)),
         ]
         types=sorted(set((topic,typ) for topic,typ,_ in streams))
         ids={p:i+1 for i,p in enumerate(types)}

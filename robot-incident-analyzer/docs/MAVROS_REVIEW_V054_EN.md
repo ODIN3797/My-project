@@ -13,3 +13,5 @@ python3 -m robot_incident_analyzer compare-reviewers rates/rate_timeline.json re
 Outputs: `reviewer_comparison.json`, `reviewer_comparison.html`. Exact recording SHA-256/topic/type, distinct reviewers and reviewed status are mandatory. Time-weighted agreement and Cohen kappa are calculated **only on the intersection of reviewed coverage**; kappa is undefined when no agreement statistics can be computed. Disagreements appear as nanosecond-exact intervals for human adjudication; the command never creates a consensus ground truth label.
 
 `validation/v054_evidence` contains **fictional reviewer labels** used solely for implementation testing. No real incident recall/precision or field-engineer agreement results are available yet.
+
+- ROS2 `sensor_msgs/Range` has a **schema-version difference**: Foxy/Humble terminate after `range`, while Jazzy/Rolling add `variance`. v0.5.4 accepts exactly these two recognized CDR layouts without inventing a variance value.

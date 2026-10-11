@@ -7,3 +7,5 @@
 - Real Zenodo sonar bag compatibility probe downloads independent source bytes **only in GitHub Actions**; original ROS bag files never added to the repository.
 - 189 automated tests pass locally including CDR, ROS2 DB3 and MCAP, reviewer validation and CLI outputs.
 - No independent real-robot fault ground truth, reviewed field incidents or calibrated accuracy claimed.
+
+- ROS2 `sensor_msgs/Range` has a **schema-version difference**: Foxy/Humble terminate after `range`, while Jazzy/Rolling add `variance`. v0.5.4 accepts exactly these two recognized CDR layouts without inventing a variance value.

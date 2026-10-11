@@ -218,6 +218,7 @@ def dashboard_script() -> str:
    const lo=Number(bar.dataset.start),hi=Number(bar.dataset.end);
    if(!Number.isFinite(lo)||!Number.isFinite(hi))return;
    windowRange=[lo,hi];
+   if(window.__riaMoveCursor)window.__riaMoveCursor((lo+hi)/2);
    bars.forEach(b=>b.setAttribute('aria-pressed',String(b===bar)));
    if(binText)binText.textContent='Time window selected · click Reset to show all';
    if(clear)clear.hidden=false;

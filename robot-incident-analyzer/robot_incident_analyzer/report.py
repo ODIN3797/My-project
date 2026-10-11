@@ -7,6 +7,7 @@ import math
 from .models import Event, Finding, TopicStats, utc_iso
 from . import __version__
 from .dashboard import DASHBOARD_CSS, density_timeline, top_sources, topic_volume, topic_timing_variation, dashboard_script
+from .signal_studio import STUDIO_CSS, studio_markup, studio_script
 
 STYLE = '''
 :root{color-scheme:dark;--bg:#0b1120;--panel:#111d30;--border:#25344b;--fg:#e7edf7;--muted:#9aaac0;--accent:#7fd1cf;--warn:#f5c46b;--error:#fa9097}
@@ -66,7 +67,7 @@ def velocity_plot(points: list[dict], markers: list[Event] | None = None,
             incident_markup.append(f'<circle cx="{px:.1f}" cy="{top+2}" r="4" fill="{color}"><title>{label}</title></circle>')
     return ('<div class="chart-legend"><span>Command linear x</span><span class="obs">Odometry linear x</span>'
             '<span class="fault">WARN / ERROR marker</span></div>'
-            '<svg class="chart" viewBox="0 0 790 246" role="img" '
+            f'<svg class="chart" viewBox="0 0 790 246" data-tmin="{x0:.6f}" data-tmax="{x1:.6f}" role="img" '
             'aria-label="Command versus odometry velocity, with timestamp-aligned incident markers">'
             + ''.join(grid) + ''.join(incident_markup)
             + f'<polyline points="{poly("command_mps")}" fill="none" stroke="#7fd1cf" stroke-width="2.5" stroke-linejoin="round"/>'
@@ -194,7 +195,7 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
     event_window=(f'{utc_iso(min(e.timestamp for e in events))} — {utc_iso(max(e.timestamp for e in events))}'
                   if events else 'No events')
     file_names=', '.join(p.name for p in input_files)
-    css = STYLE + '\n' + DASHBOARD_CSS
+    css = STYLE + '\n' + DASHBOARD_CSS + '\n' + STUDIO_CSS
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Robot Incident Analyzer | Incident Overview</title><style>{css}</style></head>
@@ -227,6 +228,7 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
 <section id="findings" aria-labelledby="findings-title"><div class="section-head"><div><h2 id="findings-title">Investigation queue</h2><p>Evidence-backed observations with concrete follow-up checks, not AI-generated certainty.</p></div><span class="pill-inline">{high} high priority</span></div>
 <div class="findings-grid">{''.join(finding_cards)}</div></section>
 <section id="signals" aria-labelledby="signals-title"><div class="section-head"><div><h2 id="signals-title">Velocity comparison · Signal explorer</h2><p>Aligned command/odometry speeds and expandable anomaly windows where both streams exist.</p></div></div>
+{studio_markup(details, events)}
 {''.join(plots) if plots else '<div class="box-card empty">No unambiguous command / odometry pair recorded. Inspect topic mapping and coverage below.</div>'}
 </section>
 <section id="timeline" aria-labelledby="events-title"><div class="section-head"><div><h2 id="events-title">Incident timeline</h2><p>Search, filter severity, or jump here from a finding.</p></div><span id="filtered-count" class="pill-inline" aria-live="polite">{len(display_events):,} / {len(display_events):,} shown</span></div>
@@ -247,7 +249,7 @@ def render_report(events: list[Event], findings: list[Finding], stats: list[Topi
 <li>Event table displays at most 2,000 records; full results are in report.json.</li>{warnings_html}</ul></div>
 </section>
 <footer class="topic-caption" style="margin-top:30px">Robot Incident Analyzer · Generated locally · Research prototype. Review data before sharing reports.</footer>
-</main></div>{dashboard_script()}</body></html>'''
+</main></div>{dashboard_script()}{studio_script()}</body></html>'''
 
 
 def save_report(output_dir: Path, events: list[Event], findings: list[Finding],

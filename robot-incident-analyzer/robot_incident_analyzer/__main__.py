@@ -47,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
     sub=parser.add_subparsers(dest='command',required=True)
     demo=sub.add_parser('demo',help='generate fictional CSV + ROS2 MCAP examples')
     demo.add_argument('--output',default='demo_data',type=Path)
+    studio_demo=sub.add_parser('demo-studio', help='generate fictional trajectories and multi-sensor MCAP')
+    studio_demo.add_argument('--output', default='studio_data', type=Path)
     custom_demo=sub.add_parser('demo-custom',help='generate fictional custom message MCAP example')
     custom_demo.add_argument('--output',default='demo_custom',type=Path)
     analyze=sub.add_parser('analyze',help='generate HTML/JSON report from inputs')
@@ -73,6 +75,12 @@ def main(argv: list[str] | None = None) -> int:
             mcap_path=make_telemetry_demo(args.output)
             print(f'Fictional CSV: {csv_path}\nFictional DB3: {db3_path}\nFictional MCAP: {mcap_path}')
             print(f'Next: python -m robot_incident_analyzer analyze {args.output} --output output')
+            return 0
+        if args.command=='demo-studio':
+            from .fixture_studio import make_studio_demo
+            path = make_studio_demo(args.output)
+            print(f'Fictional multi-sensor MCAP: {path}')
+            print(f'Next: python -m robot_incident_analyzer analyze {path} --output studio_report')
             return 0
         if args.command=='demo-custom':
             from .fixture_custom import make_custom_demo

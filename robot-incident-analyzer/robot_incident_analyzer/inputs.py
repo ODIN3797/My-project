@@ -191,7 +191,8 @@ def read_rosbag(path: Path, max_messages: int = 200_000, *, with_details: bool =
                                         f'(typical {median_gap:.3f}s); recording timestamps only',
                                         source=path.name,topic=topic))
     if with_details:
-        return events, stats, warnings, {'source':path.name,'discovery':mapping,'velocity_trace':trace, 'custom_decoded':telemetry.custom_decoded}
+        return events, stats, warnings, {'source':path.name,'discovery':mapping,'velocity_trace':trace, 'custom_decoded':telemetry.custom_decoded,
+                **telemetry.signal_sampler.result()}
     return events, stats, warnings
 
 

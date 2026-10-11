@@ -1,3 +1,29 @@
+# Robot Incident Analyzer v0.4.7 — Signal Studio
+
+**ROS2 offline incident investigation and synchronized graphs (experimental alpha).**
+
+## New in v0.4.7
+
+- Choose from numeric scalar fields in supported CDR messages: Twist, Odometry, BatteryState, IMU and LaserScan.
+- Plot explicitly provided custom `.msg` schema scalar fields, even without semantic command/odometry roles.
+- Synchronized recording-time cursor shared across scalar, XY Odometry trajectory and existing velocity comparison charts.
+- Click the timeline, path, speed plot or evidence link to focus on an observed time.
+- Deterministically downsampled graph previews, with explicit limits and uncertainty labels.
+
+**Fast offline demo (fictional MCAP):**
+
+```bash
+python3 -m robot_incident_analyzer demo-studio --output studio_data
+python3 -m robot_incident_analyzer analyze studio_data/fictional_signal_studio.mcap --output studio_report
+xdg-open studio_report/report.html
+```
+
+See [Signal Studio user guide](docs/SIGNAL_STUDIO_V047_EN.md) and [v0.4.7 release notes](RELEASE_NOTES_V047.md).
+
+> **Limit:** No real physical robot ground-truth benchmark yet; recorded time alignment does not prove causality. This is not safety-critical diagnostic software.
+
+---
+
 # Robot Incident Analyzer — v0.4.5
 
 **Offline ROS2 incident triage · MCAP/DB3 · standard and explicitly configured custom `.msg` schemas.**

@@ -13,6 +13,7 @@ import struct
 from typing import Any
 
 from .models import Event
+from .signal_studio import SignalSampler, numeric_leaves, standard_fields
 
 
 class CDR:
@@ -226,6 +227,7 @@ class TelemetryAnalyzer:
         self.decode_failures = 0
         self.discovery = None
         self.velocity_trace = []
+        self.signal_sampler = SignalSampler()
 
     def emit(self, ts, code, message, topic, severity='WARN'):
         self.events.append(Event(timestamp=ts, severity=severity, category='telemetry',
@@ -239,16 +241,29 @@ class TelemetryAnalyzer:
                     'tf2_msgs/TFMessage', 'diagnostic_msgs/DiagnosticArray',
                     'sensor_msgs/BatteryState', 'sensor_msgs/Imu', 'sensor_msgs/LaserScan'}
         custom = canonical in self.custom_roles and canonical not in standard
-        if canonical not in standard and not custom:
+        schema_only = bool(self.schema_registry and canonical in self.schema_registry.definitions
+                           and canonical not in standard and not custom)
+        if canonical not in standard and not custom and not schema_only:
             self.unsupported.add(msgtype)
             return
         try:
-            if custom:
+            if custom or schema_only:
+                raw = self.schema_registry.decode(canonical, data)
+                self.signal_sampler.add(topic, msgtype, ts, numeric_leaves(raw))
+                if schema_only:
+                    self.custom_decoded += 1
+                    return  # Schema-only scalar visualization; no inferred command semantics.
                 from .custom_messages import as_telemetry
-                decoded = as_telemetry(self.schema_registry.decode(canonical, data), self.custom_roles[canonical])
+                decoded = as_telemetry(raw, self.custom_roles[canonical])
                 self.custom_decoded += 1
             else:
                 decoded = decode_standard(msgtype, data)
+            if not custom:
+                self.signal_sampler.add(topic, msgtype, ts, standard_fields(canonical,decoded))
+            if custom:
+                self.signal_sampler.add(topic, msgtype, ts, standard_fields('nav_msgs/Odometry' if self.custom_roles[canonical]['role']=='odometry' else 'geometry_msgs/Twist',decoded))
+            if (canonical == 'nav_msgs/Odometry' or (custom and self.custom_roles[canonical]['role']=='odometry')):
+                self.signal_sampler.position(topic, decoded.get('frame', 'custom_local'), ts, decoded.get('position'))
         except (ValueError, struct.error, OverflowError, RecursionError):
             self.decode_failures += 1
             return

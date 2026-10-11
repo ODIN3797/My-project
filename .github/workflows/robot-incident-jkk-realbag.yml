@@ -1,0 +1,100 @@
+name: Public real-vehicle ROS2 MCAP validation
+on:
+  push:
+    branches: ['work/robot-incident-analyzer-alpha']
+    paths:
+      - '.github/workflows/robot-incident-jkk-realbag.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  jkk-real-vehicle-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: robot-incident-analyzer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install analyzer
+        run: python -m pip install .
+      - name: Fetch JKK Research Center sample with public provenance
+        id: download
+        shell: bash
+        run: |
+          mkdir -p real_field_input real_field_output
+          set +e
+          curl -fL --retry 1 --retry-delay 1 --connect-timeout 12 --max-time 85             'https://laesze-my.sharepoint.com/:u:/g/personal/herno_o365_sze_hu/EWJBcyPd8YZOtdys4zo8kzIButGvzj-PjTS4D-PFoUfpnQ?download=1'             -o real_field_input/download
+          status=$?
+          echo "Sample URL fetch exit code: $status"
+          if [ "$status" -ne 0 ]; then
+            curl -fL --retry 1 --retry-delay 1 --connect-timeout 12 --max-time 85               'https://laesze-my.sharepoint.com/:u:/g/personal/herno_o365_sze_hu/EVofDCG_ORZJh--XTVLFsFEBOUYB1eAbHAzdTVDdf19Y9g?download=1'               -o real_field_input/download
+            status=$?
+            echo "ZIP URL fetch exit code: $status"
+          fi
+          echo "Downloaded file characteristics:"
+          file real_field_input/download || true
+          ls -lh real_field_input/download || true
+          echo "download_exit=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Identify ROS2 MCAP files
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, zipfile
+          from pathlib import Path
+          p = Path('real_field_input/download')
+          result = {'source': 'JKK Research Center Dataset 02', 'source_page': 'https://jkk-research.github.io/dataset/jkk_dataset_02/', 'origin': 'source-described physical vehicle', 'status': 'NOT_DOWNLOADED', 'files': []}
+          if p.exists():
+              result['bytes'] = p.stat().st_size
+              result['sha256'] = hashlib.sha256(p.read_bytes()).hexdigest()
+              if p.open('rb').read(8) == bytes.fromhex('894d434150300d0a'):
+                  p.rename('real_field_input/jkk_sample.mcap')
+              elif zipfile.is_zipfile(p):
+                  with zipfile.ZipFile(p) as z:
+                      candidates = [i for i in z.infolist() if i.filename.lower().endswith('.mcap') and not i.is_dir()]
+                      result['archive_mcap_count'] = len(candidates)
+                      for i in candidates[:3]:
+                          if i.file_size > 150_000_000: continue
+                          target = Path('real_field_input') / Path(i.filename).name
+                          with z.open(i) as src, target.open('wb') as dst:
+                              import shutil
+                              shutil.copyfileobj(src, dst)
+              result['files'] = [str(x) for x in Path('real_field_input').glob('*.mcap')]
+              if result['files']: result['status'] = 'DOWNLOADED'
+              else: result['status'] = 'NO_MCAP_FOUND'
+          Path('real_field_output/provenance.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+          print(json.dumps(result, indent=2))
+          PY
+      - name: Analyze real published MCAP
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          p = Path('real_field_output/provenance.json')
+          m = json.loads(p.read_text())
+          if not m['files']:
+              print('NO REAL-BAG TEST COMPLETED: no valid MCAP was downloaded')
+              raise SystemExit(0)
+          cmd = ['python','-m','robot_incident_analyzer','field-validate',m['files'][0], '--origin','physical','--output','real_field_output/results','--max-messages','200000']
+          print('Command:', ' '.join(cmd))
+          r = subprocess.run(cmd)
+          print('Analyzer exit:',r.returncode,'(3 = review required)')
+          if r.returncode not in (0, 3):
+              raise SystemExit(r.returncode)
+          f = Path('real_field_output/results/FIELD_RESULTS.md')
+          if not f.exists():
+              raise SystemExit('Analysis did not produce FIELD_RESULTS.md')
+          print(f.read_text()[:10000])
+          PY
+      - name: Upload validation metadata and report only (not original MCAP)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jkk-public-field-validation
+          path: robot-incident-analyzer/real_field_output/
+          if-no-files-found: warn

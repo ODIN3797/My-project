@@ -112,7 +112,7 @@ The HTML report includes:
 ## Compatibility and limits
 
 - ROS2 standard supported CDR types include Twist, TwistStamped, Odometry, TFMessage, DiagnosticArray, BatteryState, Imu, LaserScan, and rcl_interfaces/Log.
-- `.mcap` is readable natively for common `cdr` messages and uncompressed chunks. zstd/lz4 chunks require optional `zstandard`/`lz4` dependencies or compatible `rosbags` integration. ROS1 bags and encrypted DB3 are not supported.
+- `.mcap` is readable natively for common `cdr` messages and uncompressed chunks. zstd chunks can use an installed `zstandard` package or compatible system `libzstd`; lz4 chunks require an optional `lz4` package or compatible `rosbags` integration. ROS1 bags and encrypted DB3 are not supported.
 - Tests generate **fictional**, valid example DB3/MCAP message records. Recorded robot logs from real hardware are not used or included.
 - `rosbags`, `zstandard`, and `lz4` are optional, not bundled. Install separately when needed. This environment has not verified an installed `rosbags` custom-schema reader.
 - Resource caps: message count, schema size, array/sequence size and GUI upload size; nonetheless do not process untrusted logs without isolation.
@@ -181,3 +181,12 @@ Details: [Overseas engineer field-pilot guide](docs/FIELD_PILOT_EN.md) and [í•œê
 - The ROS2 `orientation_covariance[0] == -1` sentinel is honored; unavailable orientation is not flagged.
 - 61 automated tests pass locally, including seven new CDR, DB3/MCAP and defensive regression tests.
 - These heuristics still require review of the bag's provenance, message types and publisher behavior.
+
+## Independent GitHub repository setup
+
+See [docs/STANDALONE_GITHUB_SETUP.md](docs/STANDALONE_GITHUB_SETUP.md). The owner must create and authorize the independent repository before migration.
+
+## v0.4.6 Visual incident dashboard
+
+Generated `report.html` now includes an offline evidence-centric dashboard with:
+stacked event histogram (click to filter the event table), severity/search filters, linked findings, preserved velocity traces, ROS2 topic count and recording gap visualizations. The design is responsive, and **no bag data is sent to the cloud**. See [competitor / feature analysis](docs/COMPETITOR_GAP_V046.md) and [release notes](RELEASE_NOTES_V046.md).

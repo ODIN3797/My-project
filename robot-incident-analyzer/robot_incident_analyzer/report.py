@@ -6,6 +6,7 @@ from pathlib import Path
 import math
 from .models import Event, Finding, TopicStats, utc_iso
 from . import __version__
+from .dashboard import DASHBOARD_CSS, density_timeline, top_sources, topic_volume, topic_timing_variation, dashboard_script
 
 STYLE = '''
 :root{color-scheme:dark;--bg:#0b1120;--panel:#111d30;--border:#25344b;--fg:#e7edf7;--muted:#9aaac0;--accent:#7fd1cf;--warn:#f5c46b;--error:#fa9097}
@@ -114,58 +115,139 @@ def render_discovery(details: list[dict]) -> str:
 
 def render_report(events: list[Event], findings: list[Finding], stats: list[TopicStats],
                   warnings: list[str], input_files: list[Path], details: list[dict] | None = None) -> str:
-    details=details or []
-    source_names = ', '.join(x.name for x in input_files)
-    charts=''.join('<section class="panel"><h3>'+esc(d.get('source',''))+'</h3>'+
-                   '<p class="small">Custom CDR messages decoded: '+str(d.get('custom_decoded',0))+'</p>'+
-                   velocity_plot(d.get('velocity_trace',[]),[e for e in events if e.source==d.get('source')])+
-                   event_focus_charts(d, events)+'</section>' for d in details if d.get('velocity_trace'))
-    discovery_html=render_discovery(details)
-    errors = sum(x.severity in ('ERROR','FATAL') for x in events)
-    event_window = (f'{utc_iso(events[0].timestamp)} — {utc_iso(events[-1].timestamp)}' if events else 'No events')
-    metrics = [(len(events), 'Log / incident events'), (errors, 'Error records'),
-               (len([f for f in findings if f.severity == 'HIGH']), 'High-priority correlations'),
-               (len(stats), 'ROS2 topics inspected')]
-    metric_html = ''.join(f'<div class="metric"><div class="num">{val}</div><span class="small">{esc(label)}</span></div>' for val,label in metrics)
-    finding_html = ''
-    for finding in findings:
-        evidence_html = ''.join(f'<a href="#event-{esc(eid)}">{esc(eid)}</a>' for eid in finding.evidence_ids)
-        checks = ''.join(f'<li>{esc(s)}</li>' for s in finding.suggested_checks)
-        finding_html += (f'<section class="finding"><div class="finding-head"><span class="pill {esc(finding.severity)}">{esc(finding.severity)}</span>'
-                         f'<h3>{esc(finding.title)}</h3></div><p>{esc(finding.explanation)}</p>'
-                         f'<p class="small">Evidence status: {esc(finding.confidence)}</p><ul>{checks}</ul>'
-                         f'<div class="evidence">{evidence_html}</div></section>')
-    event_html = ''.join(f'<tr id="event-{esc(e.event_id)}"><td><a href="#event-{esc(e.event_id)}">{esc(e.event_id)}</a></td>'
-                         f'<td>{esc(utc_iso(e.timestamp))}</td><td class="sev-{esc(e.severity.lower())}">{esc(e.severity)}</td>'
-                         f'<td><code>{esc(e.code)}</code></td><td>{esc(e.message)}</td><td class="small">{esc(e.source)}</td></tr>'
-                         for e in events[:2000])
-    topic_html = ''.join(f'<tr><td><code>{esc(st.topic)}</code></td><td>{st.count:,}</td><td>{st.approx_hz:.2f}</td>'
-                         f'<td>{st.median_gap_ms:.1f}</td><td>{st.max_gap_ms:.1f}</td></tr>' for st in stats)
-    warnings_html = ''.join(f'<li>{esc(x)}</li>' for x in warnings)
-    return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Robot Incident Analyzer — Report</title><style>{STYLE}</style></head><body><main>
-<div class="eyebrow">Robot Incident Analyzer · offline MVP v{__version__}</div><h1>Robot incident report</h1>
-<p class="muted">Evidence-first investigation of recorded robot events. No files uploaded or AI model called.</p>
-<div class="small"><b>Input:</b> {esc(source_names)}<br><b>Recorded window (UTC):</b> {esc(event_window)}</div>
-<div class="summary">{metric_html}</div><div class="notice"><b>Interpretation warning:</b> Correlated events are hypotheses, not verified root causes. Topic gaps use recording timestamps, not hardware sensor timestamps. No issues detected does not prove a healthy robot.</div>
-<h2>Topic auto-discovery</h2>{discovery_html}
-<h2>Velocity comparison · recording timestamps</h2>
-<p class="muted">Aligned command/feedback curves, incident markers, and expandable anomaly-centered windows. Click a window for ±2.5 second inspection.</p>{charts or '<div class="panel muted">No unambiguous command / odometry pair.</div>'}
-<h2>Investigation findings</h2>{finding_html}
-<h2>Incident timeline</h2><div class="toolbar"><input id="event-filter" type="search" placeholder="Search events / codes" aria-label="Filter event table"><select id="severity-filter" aria-label="Filter severity"><option value="">All severities</option><option value="WARN">WARN</option><option value="ERROR">ERROR</option><option value="FATAL">FATAL</option><option value="INFO">INFO</option></select></div><div class="panel tablewrap"><table id="events-table"><thead><tr><th>ID</th><th>UTC time</th><th>Severity</th><th>Code</th><th>Message / observation</th><th>Source</th></tr></thead><tbody>{event_html}</tbody></table></div>
-<h2>ROS2 topic timing</h2><div class="panel tablewrap"><table><thead><tr><th>Topic</th><th>Messages</th><th>Approx Hz</th><th>Median gap (ms)</th><th>Max gap (ms)</th></tr></thead><tbody>{topic_html or '<tr><td colspan="5" class="muted">No bag topics inspected</td></tr>'}</tbody></table></div>
-<h2>Coverage and limitations</h2><div class="panel"><ul><li>CSV, ROS2 DB3 and MCAP supported; MCAP zstd/lz4 chunks require optional decompression packages.</li><li>Standard CDR types decoded, plus selected custom .msg types when authorized schema directories and explicit field maps are provided in configuration.</li><li>Custom .idl, arbitrary binary layouts, DDS XCDR2, and automatic field-semantic inference are not supported; missing/incompatible schema fields are excluded with warnings.</li><li>Experimental thresholds can be configured; velocity difference can reflect intentional stop, safety state or clock/frame mismatch.</li><li>Topic name/type matching is a candidate inference, not a guarantee of robot semantics; inspect mapping results before trusting any command/odom comparison.</li><li>Maximum 2,000 events displayed in HTML; full collection saved as report.json.</li>{warnings_html}</ul></div>
-<p class="small" style="margin-top:35px">Generated locally · Synthetic examples only · Do not upload confidential customer or employer data</p>
-<script>
-(function(){{
-const input=document.getElementById('event-filter'), severity=document.getElementById('severity-filter');
-function apply(){{const q=input.value.toLowerCase(), s=severity.value;
-document.querySelectorAll('#events-table tbody tr').forEach(row=>{{
-row.style.display=(row.textContent.toLowerCase().includes(q)&&(!s||row.cells[2].textContent.trim()===s))?'':'none';
-}});}}
-if(input&&severity){{input.addEventListener('input',apply);severity.addEventListener('change',apply);}}
-}})();
-</script></main></body></html>'''
+    """Incident-first offline HTML dashboard; no internet access or JS dependencies."""
+    details = details or []
+    display_events = sorted(events, key=lambda e: (e.timestamp, e.event_id))[:2000]
+    severity_errors = sum(e.severity in ('ERROR', 'FATAL') for e in events)
+    severity_warns = sum(e.severity == 'WARN' for e in events)
+    high = sum(f.severity == 'HIGH' for f in findings)
+    metrics = [
+        (f'{len(events):,}', 'Recorded observations'),
+        (f'{severity_errors:,}', 'Error / fatal events'),
+        (f'{len(findings):,}', 'Investigation findings'),
+        (f'{len(stats):,}', 'ROS2 topics inspected'),
+    ]
+    metric_html = ''.join(
+        f'<div class="kpi"><div class="kpi-val">{esc(value)}</div>'
+        f'<span class="kpi-label">{esc(label)}</span></div>'
+        for value, label in metrics)
+
+    # Navigable event evidence never silently vanishes due to filters.
+    evidence_visible = {e.event_id for e in display_events}
+    finding_cards = []
+    for f in findings[:30]:
+        tone = (f.severity or 'INFO').lower()
+        if tone not in ('high', 'medium', 'info'): tone = 'info'
+        checks = ''.join('<li>' + esc(q) + '</li>' for q in f.suggested_checks[:4])
+        evidence = ''.join(
+            (f'<a class="evidence-link" href="#event-{esc(eid)}" title="Jump to evidence">'
+             f'↗ {esc(eid)}</a>' if eid in evidence_visible else
+             f'<span class="evidence-link" title="Evidence in JSON export">{esc(eid)} · JSON</span>')
+            for eid in f.evidence_ids[:6])
+        finding_cards.append(
+            f'<article class="investigation-card {tone}"><div class="finding-head">'
+            f'<h3>{esc(f.title)}</h3><span class="severity-pill {tone}">{esc(f.severity)}</span>'
+            f'</div><p>{esc(f.explanation)}</p><div class="aux-text">Evidence: {esc(f.confidence)}</div>'
+            f'<ol>{checks}</ol><div>{evidence}</div></article>')
+    if not finding_cards:
+        finding_cards=['<p class="empty">No configured investigation rules matched. This is not proof of robot health.</p>']
+    if len(findings) > 30:
+        finding_cards.append(f'<p class="aux-text">Showing 30 of {len(findings):,} findings. Full list: report.json.</p>')
+
+    # Event table filtering is client-side and never alters original report.json.
+    event_html=''.join(
+        f'<tr id="event-{esc(e.event_id)}" data-ts="{e.timestamp:.9f}" data-severity="{esc(e.severity)}">'
+        f'<td><a href="#event-{esc(e.event_id)}">{esc(e.event_id)}</a></td>'
+        f'<td>{esc(utc_iso(e.timestamp))}</td>'
+        f'<td class="status-{esc(e.severity.lower())}">{esc(e.severity)}</td>'
+        f'<td><code>{esc(e.code)}</code></td><td>{esc(e.message)}</td>'
+        f'<td>{esc(e.source)}</td></tr>' for e in display_events)
+    table = ('<div class="table-scroll"><table id="events-table" class="report-table">'
+             '<thead><tr><th>ID</th><th>UTC timestamp</th><th>Level</th><th>Code</th>'
+             '<th>Evidence / observation</th><th>Input</th></tr></thead><tbody>'
+             + event_html + '</tbody></table></div>')
+    topic_rows=''.join(
+        f'<tr><td><code>{esc(st.topic)}</code><div class="aux-text">{esc(st.message_type)}</div></td>'
+        f'<td>{st.count:,}</td><td>{st.approx_hz:.2f}</td>'
+        f'<td>{st.median_gap_ms:.1f}</td><td>{st.max_gap_ms:.1f}</td></tr>'
+        for st in sorted(stats, key=lambda x: -x.count))
+    topic_table = ('<div class="table-scroll"><table class="report-table"><thead><tr>'
+                   '<th>Topic / type</th><th>Messages</th><th>Approx Hz</th>'
+                   '<th>Median gap ms</th><th>Max gap ms</th></tr></thead><tbody>'
+                   + (topic_rows or '<tr><td colspan="5">No ROS2 topic statistics available</td></tr>')
+                   + '</tbody></table></div>')
+
+    plots = []
+    for d in details:
+        if not d.get('velocity_trace'): continue
+        src = d.get('source', '')
+        trace = d['velocity_trace']
+        mark = [e for e in events if e.source == src]
+        plots.append('<div class="box-card"><div class="card-heading"><h3>' + esc(src)
+                     + '</h3><span class="pill-inline">Recorded signals</span></div>'
+                     + f'<p class="aux-text">{len(trace):,} aligned samples ·'
+                     f' · Custom CDR messages decoded: {d.get("custom_decoded", 0):,}</p>'
+                     + velocity_plot(trace,mark) + event_focus_charts(d,events) + '</div>')
+    warnings_html=''.join('<li>'+esc(x)+'</li>' for x in warnings)
+    alert_note=(f'{len(warnings)} coverage warning(s) need review.' if warnings
+                else 'No input warnings emitted. This does not confirm full diagnostic coverage.')
+    event_window=(f'{utc_iso(min(e.timestamp for e in events))} — {utc_iso(max(e.timestamp for e in events))}'
+                  if events else 'No events')
+    file_names=', '.join(p.name for p in input_files)
+    css = STYLE + '\n' + DASHBOARD_CSS
+    return f'''<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot Incident Analyzer | Incident Overview</title><style>{css}</style></head>
+<body><div class="report-shell">
+<aside class="rail" aria-label="Report navigation">
+ <a class="brand" href="#overview"><span class="brand-mark" aria-hidden="true">⌁</span><span>R I A <span>Robot insights</span></span></a>
+ <nav aria-label="Sections"><p class="nav-heading">INVESTIGATE</p>
+  <a class="nav-link" href="#overview"><span class="nav-num">01</span> Overview</a>
+  <a class="nav-link" href="#findings"><span class="nav-num">02</span> Findings</a>
+  <a class="nav-link" href="#signals"><span class="nav-num">03</span> Signals</a>
+  <a class="nav-link" href="#timeline"><span class="nav-num">04</span> Event log</a>
+  <a class="nav-link" href="#topics"><span class="nav-num">05</span> Topic coverage</a>
+ </nav>
+ <div class="rail-bottom"><strong>Offline by design</strong><br>No files uploaded to external servers. No AI API. Correlation ≠ causation.<br><br>Experimental diagnostics only.</div>
+</aside>
+<main class="report-main" id="overview">
+<div class="eyebrow">Investigations / recorded data · v{esc(__version__)}</div>
+<div class="hero-head"><div><h1>Incident overview</h1><p class="dek">From recorded signals to testable hypotheses. Inspect anomalies, linked evidence and affected telemetry without leaving this report.</p></div>
+<span class="report-chip">● OFFLINE ANALYSIS</span></div>
+<div class="file-meta"><b>Inputs</b> · {esc(file_names)}<br><b>Observed event window (UTC)</b> · {esc(event_window)}</div>
+<div class="kpi-row">{metric_html}</div>
+<div class="warning-block"><b>Evidence, not a diagnosis.</b> These counts reflect observed events and configured analysis rules; no fault cause is verified. {esc(alert_note)}</div>
+<section aria-labelledby="activity-title">
+<div class="section-head"><div><h2 id="activity-title">Event activity</h2><p>Look for bursts in recorded events; select a window to filter the table.</p></div><span class="pill-inline">{severity_warns:,} WARN · {severity_errors:,} ERROR/FATAL</span></div>
+<div class="grid-two">
+<div class="box-card"><div class="card-heading"><h3>Events over recording time</h3><span class="aux-text">Counts per bin</span></div>{density_timeline(events)}</div>
+<div class="box-card"><div class="card-heading"><h3>Where events came from</h3><span class="aux-text">Source grouping</span></div>{top_sources(events)}
+<div class="insight-note">Source volume is not a reliability rating; merged logs can span multiple robots.</div></div>
+</div></section>
+<section id="findings" aria-labelledby="findings-title"><div class="section-head"><div><h2 id="findings-title">Investigation queue</h2><p>Evidence-backed observations with concrete follow-up checks, not AI-generated certainty.</p></div><span class="pill-inline">{high} high priority</span></div>
+<div class="findings-grid">{''.join(finding_cards)}</div></section>
+<section id="signals" aria-labelledby="signals-title"><div class="section-head"><div><h2 id="signals-title">Velocity comparison · Signal explorer</h2><p>Aligned command/odometry speeds and expandable anomaly windows where both streams exist.</p></div></div>
+{''.join(plots) if plots else '<div class="box-card empty">No unambiguous command / odometry pair recorded. Inspect topic mapping and coverage below.</div>'}
+</section>
+<section id="timeline" aria-labelledby="events-title"><div class="section-head"><div><h2 id="events-title">Incident timeline</h2><p>Search, filter severity, or jump here from a finding.</p></div><span id="filtered-count" class="pill-inline" aria-live="polite">{len(display_events):,} / {len(display_events):,} shown</span></div>
+<div class="quick-filter" aria-label="Severity quick filters"><button class="filter-chip active" data-severity-chip="">All events</button><button class="filter-chip" data-severity-chip="ERROR">Errors</button><button class="filter-chip" data-severity-chip="WARN">Warnings</button><button class="filter-chip" data-severity-chip="INFO">Info</button><button class="filter-chip" data-severity-chip="FATAL">Fatal</button></div>
+<div class="event-tools"><label class="visually-hidden" for="event-filter">Search events</label><input id="event-filter" class="input-search" type="search" placeholder="Search code, source, message…" aria-label="Search event log">
+<label class="visually-hidden" for="severity-filter">Severity</label><select class="input-select" id="severity-filter"><option value="">All severities</option><option value="ERROR">ERROR</option><option value="WARN">WARN</option><option value="INFO">INFO</option><option value="FATAL">FATAL</option></select>
+<button class="filter-chip" id="clear-window" type="button" hidden>Reset time window ↻</button><span class="aux-text" id="active-bin-label"></span></div>
+{table}
+{('<p class="topic-caption">First 2,000 time-sorted events shown; complete event set in report.json.</p>' if len(events)>2000 else '')}
+</section>
+<section id="topics" aria-labelledby="topics-title"><div class="section-head"><div><h2 id="topics-title">Topics & coverage</h2><p>Check which signals were recorded before interpreting an apparent incident.</p></div></div>
+<div class="grid-two"><div class="box-card"><div class="card-heading"><h3>Most recorded topics</h3><span class="aux-text">By message count</span></div>{topic_volume(stats)}</div>
+<div class="box-card"><div class="card-heading"><h3>Topic auto-discovery</h3><span class="aux-text">Roles must be reviewed</span></div>{render_discovery(details)}</div></div>
+<div class="box-card" style="margin-top:14px"><div class="card-heading"><h3>Largest timing variations</h3><span class="aux-text">Recording gap ratio</span></div>{topic_timing_variation(stats)}</div>
+<div class="box-card" style="margin-top:14px"><h3 style="margin-bottom:10px">Topic timing table</h3><p class="topic-caption">Approx Hz and gaps use recorded timestamps, not sensor hardware stamps; sorting based on recorded message volume.</p>{topic_table}</div>
+<div class="box-card" style="margin-top:14px"><h3>Limitations & analyst notes</h3><ul class="warning-list"><li>Standard CDR types decoded, plus configured custom message schemas; XCDR2, arbitrary .idl and unsupported schemas may be excluded.</li>
+<li>Timeline is event-derived; unrecorded time and missing topics are not shown as healthy periods.</li><li>Timestamp-aligned events are observations, not verified root causes. No finding does not mean a healthy robot.</li>
+<li>Event table displays at most 2,000 records; full results are in report.json.</li>{warnings_html}</ul></div>
+</section>
+<footer class="topic-caption" style="margin-top:30px">Robot Incident Analyzer · Generated locally · Research prototype. Review data before sharing reports.</footer>
+</main></div>{dashboard_script()}</body></html>'''
 
 
 def save_report(output_dir: Path, events: list[Event], findings: list[Finding],

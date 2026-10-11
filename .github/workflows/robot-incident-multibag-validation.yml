@@ -1,0 +1,39 @@
+name: Independent multi-dataset ROS2 bag validation
+on:
+  push:
+    branches: ['work/robot-incident-analyzer-alpha']
+    paths:
+      - 'robot-incident-analyzer/robot_incident_analyzer/bag_comparison.py'
+      - 'robot-incident-analyzer/robot_incident_analyzer/__main__.py'
+      - 'robot-incident-analyzer/validation/run_public_multibag.py'
+      - 'robot-incident-analyzer/tests/test_multi_bag_v051.py'
+      - '.github/workflows/robot-incident-multibag-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent-bag-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    defaults:
+      run:
+        working-directory: robot-incident-analyzer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install .
+      - name: Local comparison tests
+        run: python -m unittest tests.test_multi_bag_v051 -v
+      - name: Download and analyze three independently published ROS2 datasets
+        shell: bash
+        run: |
+          python validation/run_public_multibag.py --output public_multibag_results --input-dir public_raw
+      - name: Upload results only, never source bag recordings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: independent-multi-ros2-bag-evidence
+          path: robot-incident-analyzer/public_multibag_results/
+          if-no-files-found: warn

@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "comparison_kind": "independent-operator-reviewer-agreement",
+  "recording_sha256": "ee7f6fdb4b535a3a60443ab9abdf44c11c6b4531a4090d7f2dbcca071f22d3f0",
+  "topic": "/robot/cmd_vel",
+  "message_type": "geometry_msgs/msg/Twist",
+  "reviewers": [
+    "fictional_reviewer_A",
+    "fictional_reviewer_B"
+  ],
+  "jointly_reviewed_seconds": 18.0,
+  "agreement_seconds": 16.0,
+  "disagreement_seconds": 2.0,
+  "agreement_fraction": 0.888889,
+  "cohens_kappa": 0.727273,
+  "kappa_note": "time-weighted over jointly reviewed intervals",
+  "both_positive_seconds": 4.0,
+  "both_negative_seconds": 12.0,
+  "single_reviewer_coverage_seconds": 0.0,
+  "disagreement_interval_count": 2,
+  "disagreement_intervals": [
+    {
+      "start_ns": 1740000021000000000,
+      "end_ns": 1740000022000000000,
+      "left": "positive",
+      "right": "negative"
+    },
+    {
+      "start_ns": 1740000026000000000,
+      "end_ns": 1740000027000000000,
+      "left": "positive",
+      "right": "negative"
+    }
+  ],
+  "disagreement_intervals_truncated": false,
+  "notes": [
+    "Independent review is operator asserted, not independently audited.",
+    "Agreement does not make either review a verified physical fault diagnosis.",
+    "Disagreements require separate adjudication; no majority vote or truth merge is produced.",
+    "Unreviewed time is never assumed negative.",
+    "Kappa is undefined if there is no joint review or chance agreement is 100%."
+  ]
+}

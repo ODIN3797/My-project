@@ -1,0 +1,21 @@
+{
+  "schema_dirs": ["schemas"],
+  "custom_messages": {
+    "acme_robot_msgs/msg/DriveCommand": {
+      "role": "command",
+      "linear_x": "target.linear_x",
+      "angular_z": "target.angular_z"
+    },
+    "acme_robot_msgs/msg/DriveFeedback": {
+      "role": "odometry",
+      "linear_x": "velocity_x",
+      "position_x": "pos_x",
+      "position_y": "pos_y"
+    }
+  },
+  "topics": {
+    "command": "/robot1/drive/input",
+    "odometry": "/robot1/drive/feedback"
+  },
+  "thresholds": {"mismatch_min_samples": 4, "mismatch_min_duration_s": 0.25}
+}

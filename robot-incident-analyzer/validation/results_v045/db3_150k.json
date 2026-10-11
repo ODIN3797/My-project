@@ -1,0 +1,16 @@
+{
+  "type": "synthetic load test (NOT real robot)",
+  "python": "3.13.5",
+  "platform": "linux",
+  "paired_samples": 75000,
+  "messages": 150000,
+  "db3_size_mb": 58.75,
+  "generation_seconds": 2.036,
+  "analysis_seconds": 2.072,
+  "peak_process_rss_mb": 252.9,
+  "events": 0,
+  "findings": 1,
+  "topics": 2,
+  "warnings": [],
+  "expected_control_anomalies": 0
+}

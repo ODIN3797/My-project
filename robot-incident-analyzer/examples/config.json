@@ -1,0 +1,17 @@
+{
+  "topics": {
+    "command": "/robot1/navifra/control/velocity_cmd",
+    "odometry": "/robot1/wheel/odom"
+  },
+  "thresholds": {
+    "command_min_mps": 0.2,
+    "odom_stopped_max_mps": 0.03,
+    "sync_tolerance_s": 0.35,
+    "mismatch_min_samples": 4,
+    "mismatch_min_duration_s": 0.25,
+    "odom_jump_m": 1.0,
+    "odom_jump_window_s": 0.5,
+    "tf_jump_m": 1.0,
+    "tf_jump_window_s": 1.0
+  }
+}

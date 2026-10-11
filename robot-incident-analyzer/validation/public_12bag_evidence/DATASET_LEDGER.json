@@ -1,0 +1,580 @@
+{
+  "method": "External ROS2 bag file compatibility and topic rate evaluation (not fault classification)",
+  "recording_sources": {
+    "experiment1": {
+      "url": "https://zenodo.org/records/17649537/files/Experiment_1.zip?download=1",
+      "success": true,
+      "files": [
+        "experiment1/E1-1/rosbag2_2024_03_11-13_14_19_0.db3",
+        "experiment1/E1-2/rosbag2_2024_03_11-13_30_46_0.db3"
+      ],
+      "bytes": 1644570,
+      "sha256": "a11126189729e6ab15e1416643bf4522d0024f51c24c319743a4d0832fd36da4",
+      "bag_count": 2,
+      "bag_summaries": [
+        {
+          "name": "rosbag2_2024_03_11-13_14_19_0.db3",
+          "path": "experiment1/E1-1/rosbag2_2024_03_11-13_14_19_0.db3",
+          "messages": 7120,
+          "topics": 8,
+          "duration_s": 75.5837,
+          "sha256": "5830a7d1465a318d58bbc9a68823a1571370dc7681ce22652241ae6e792a1c1a",
+          "rate_preview": [
+            {
+              "topic": "/mobile_base_controller/cmd_vel",
+              "hz": 19.8495
+            },
+            {
+              "topic": "/mobile_base_controller/odom",
+              "hz": 18.0836
+            }
+          ]
+        },
+        {
+          "name": "rosbag2_2024_03_11-13_30_46_0.db3",
+          "path": "experiment1/E1-2/rosbag2_2024_03_11-13_30_46_0.db3",
+          "messages": 10355,
+          "topics": 7,
+          "duration_s": 40.1602,
+          "sha256": "a0d8134f693ee8409790240fcf52e500b646feae76e70260d1e4f0a183ec4dd0",
+          "rate_preview": [
+            {
+              "topic": "/mobile_base_controller/cmd_vel",
+              "hz": 165.1926
+            },
+            {
+              "topic": "/mobile_base_controller/odom",
+              "hz": 28.8373
+            }
+          ]
+        }
+      ],
+      "full_event_analysis_return_code": 3,
+      "deep_analysis": [
+        {
+          "name": "rosbag2_2024_03_11-13_14_19_0.db3",
+          "messages": 7120,
+          "topic_count": 8,
+          "event_count": 3,
+          "finding_count": 4,
+          "event_codes": {
+            "CMD_ODOM_MISMATCH": 1,
+            "ODOM_POSITION_JUMP": 2
+          },
+          "status": "REVIEW_REQUIRED",
+          "review_flags": [
+            "incomplete_or_ambiguous_analysis"
+          ],
+          "warning_count": 1,
+          "topic_mappings": [
+            {
+              "command": "/mobile_base_controller/cmd_vel",
+              "odometry": "/mobile_base_controller/odom"
+            }
+          ]
+        },
+        {
+          "name": "rosbag2_2024_03_11-13_30_46_0.db3",
+          "messages": 10355,
+          "topic_count": 7,
+          "event_count": 1,
+          "finding_count": 1,
+          "event_codes": {
+            "CMD_ODOM_MISMATCH": 1
+          },
+          "status": "REVIEW_REQUIRED",
+          "review_flags": [
+            "incomplete_or_ambiguous_analysis"
+          ],
+          "warning_count": 1,
+          "topic_mappings": [
+            {
+              "command": "/mobile_base_controller/cmd_vel",
+              "odometry": "/mobile_base_controller/odom"
+            }
+          ]
+        }
+      ]
+    },
+    "vigo_navigation": {
+      "url": "https://zenodo.org/records/15433859/files/Navigation.zip?download=1",
+      "success": true,
+      "files": [
+        "vigo_navigation/Navigation/Trajectory1/rosbag2_2024_06_14-12_45_42_0.db3",
+        "vigo_navigation/Navigation/Trajectory2/rosbag2_2024_06_14-12_52_02_0.db3",
+        "vigo_navigation/Navigation/Trajectory3/rosbag2_2024_06_14-12_57_11_0.db3",
+        "vigo_navigation/Navigation/Trajectory4/rosbag2_2024_06_14-13_02_45_0.db3",
+        "vigo_navigation/Navigation/Trajectory5/rosbag2_2024_06_14-13_07_00_0.db3",
+        "vigo_navigation/Navigation/Trajectory6/rosbag2_2024_06_14-13_12_43_0.db3",
+        "vigo_navigation/Navigation/Trajectory7/rosbag2_2024_06_14-13_24_49_0.db3",
+        "vigo_navigation/Navigation/Trajectory8/rosbag2_2024_06_14-13_30_51_0.db3",
+        "vigo_navigation/Navigation/Trajectory9/rosbag2_2024_06_14-13_47_51_0.db3"
+      ],
+      "bytes": 9042897,
+      "sha256": "fbba3db39723cb36cec3049be3abde9f1afe2190bd7f6cf5bfc8fa9f0744a8f9",
+      "bag_count": 9,
+      "bag_summaries": [
+        {
+          "name": "rosbag2_2024_06_14-12_45_42_0.db3",
+          "path": "vigo_navigation/Navigation/Trajectory1/rosbag2_2024_06_14-12_45_42_0.db3",
+          "messages": 18583,
+          "topics": 18,
+          "duration_s": 215.0231,
+          "sha256": "2b8e240ad6caa9554a2798fdee8018a6d1299ca217a2892a540bd98aa88cece3",
+          "rate_preview": []
+        },
+        {
+          "name": "rosbag2_2024_06_14-12_52_02_0.db3",
+          "path": "vigo_navigation/Navigation/Trajectory2/rosbag2_2024_06_14-12_52_02_0.db3",
+          "messages": 15602,
+          "topics": 18,
+          "duration_s": 177.9069,
+          "sha256": "35fb0c57ff535515aaca0ba860e646d9fd8b4804f0c54fb925f7ab772a0b7a8a",
+          "rate_preview": []
+        },
+        {
+          "name": "rosbag2_2024_06_14-12_57_11_0.db3",
+          "path": "vigo_navigation/Navigation/Trajectory3/rosbag2_2024_06_14-12_57_11_0.db3",
+          "messages": 16799,
+          "topics": 18,
+          "duration_s": 192.7463,
+          "sha256": "8b5ea51f3a7efa54e09fcc967902c448acd81d83db0093faa2041c88f51d1d44",
+          "rate_preview": []
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_02_45_0.db3",
+          "path": "vigo_navigation/Navigation/Trajectory4/rosbag2_2024_06_14-13_02_45_0.db3",
+          "messages": 15624,
+          "topics": 18,
+          "duration_s": 179.7542,
+          "sha256": "006fe8784c66884aa3c5dd742081c403470969bf7208b6dca8417887e3337b21",
+          "rate_preview": []
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_07_00_0.db3",
+          "path": "vigo_navigation/Navigation/Trajectory5/rosbag2_2024_06_14-13_07_00_0.db3",
+          "messages": 15284,
+          "topics": 18,
+          "duration_s": 174.6967,
+          "sha256": "0cad7aa1e013e69f6f9b5306b8643b119672121a4db31ab159932d2dd3c61909",
+          "rate_preview": []
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_12_43_0.db3",
+          "path": "vigo_navigation/Navigation/Trajectory6/rosbag2_2024_06_14-13_12_43_0.db3",
+          "messages": 14125,
+          "topics": 18,
+          "duration_s": 161.9256,
+          "sha256": "364d550eafeaa17e36c67787ba29ef7a15ff8149f41d0b981486297a5b0f7ea6",
+          "rate_preview": []
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_24_49_0.db3",
+          "path": "vigo_navigation/Navigation/Trajectory7/rosbag2_2024_06_14-13_24_49_0.db3",
+          "messages": 12793,
+          "topics": 18,
+          "duration_s": 156.0536,
+          "sha256": "d53b62b359f9f11129b77e490705b866016454982b80753764ff26e7e0a6d81d",
+          "rate_preview": []
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_30_51_0.db3",
+          "path": "vigo_navigation/Navigation/Trajectory8/rosbag2_2024_06_14-13_30_51_0.db3",
+          "messages": 13883,
+          "topics": 18,
+          "duration_s": 163.9607,
+          "sha256": "8ca3f1a41461bdf6eb3c3202938bb478089d0222122e984df83667e9ccba60ef",
+          "rate_preview": []
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_47_51_0.db3",
+          "path": "vigo_navigation/Navigation/Trajectory9/rosbag2_2024_06_14-13_47_51_0.db3",
+          "messages": 40201,
+          "topics": 18,
+          "duration_s": 464.1987,
+          "sha256": "0f8b8213d1877bcdbd694fb484f32ccd2d1b8223ac0d2fad4c1dd014f27aca48",
+          "rate_preview": []
+        }
+      ],
+      "full_event_analysis_return_code": 3,
+      "deep_analysis": [
+        {
+          "name": "rosbag2_2024_06_14-12_45_42_0.db3",
+          "messages": 18583,
+          "topic_count": 18,
+          "event_count": 2,
+          "finding_count": 1,
+          "event_codes": {
+            "ROS_LOG": 2
+          },
+          "status": "REVIEW_REQUIRED",
+          "review_flags": [
+            "incomplete_or_ambiguous_analysis",
+            "no_unambiguous_command_odometry_pair"
+          ],
+          "warning_count": 3,
+          "topic_mappings": [
+            {
+              "odometry": "/rpsc4/global_position/local"
+            }
+          ]
+        },
+        {
+          "name": "rosbag2_2024_06_14-12_52_02_0.db3",
+          "messages": 15602,
+          "topic_count": 18,
+          "event_count": 3,
+          "finding_count": 1,
+          "event_codes": {
+            "ROS_LOG": 2,
+            "SENSOR": 1
+          },
+          "status": "REVIEW_REQUIRED",
+          "review_flags": [
+            "incomplete_or_ambiguous_analysis",
+            "no_unambiguous_command_odometry_pair"
+          ],
+          "warning_count": 3,
+          "topic_mappings": [
+            {
+              "odometry": "/rpsc4/global_position/local"
+            }
+          ]
+        },
+        {
+          "name": "rosbag2_2024_06_14-12_57_11_0.db3",
+          "messages": 16799,
+          "topic_count": 18,
+          "event_count": 4,
+          "finding_count": 3,
+          "event_codes": {
+            "ROS_LOG": 3,
+            "DIAGNOSTIC_ERROR": 1
+          },
+          "status": "REVIEW_REQUIRED",
+          "review_flags": [
+            "incomplete_or_ambiguous_analysis",
+            "no_unambiguous_command_odometry_pair"
+          ],
+          "warning_count": 3,
+          "topic_mappings": [
+            {
+              "odometry": "/rpsc4/global_position/local"
+            }
+          ]
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_02_45_0.db3",
+          "messages": 15624,
+          "topic_count": 18,
+          "event_count": 2,
+          "finding_count": 1,
+          "event_codes": {
+            "ROS_LOG": 2
+          },
+          "status": "REVIEW_REQUIRED",
+          "review_flags": [
+            "incomplete_or_ambiguous_analysis",
+            "no_unambiguous_command_odometry_pair"
+          ],
+          "warning_count": 3,
+          "topic_mappings": [
+            {
+              "odometry": "/rpsc4/global_position/local"
+            }
+          ]
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_07_00_0.db3",
+          "messages": 15284,
+          "topic_count": 18,
+          "event_count": 2,
+          "finding_count": 1,
+          "event_codes": {
+            "ROS_LOG": 2
+          },
+          "status": "REVIEW_REQUIRED",
+          "review_flags": [
+            "incomplete_or_ambiguous_analysis",
+            "no_unambiguous_command_odometry_pair"
+          ],
+          "warning_count": 3,
+          "topic_mappings": [
+            {
+              "odometry": "/rpsc4/global_position/local"
+            }
+          ]
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_12_43_0.db3",
+          "messages": 14125,
+          "topic_count": 18,
+          "event_count": 2,
+          "finding_count": 1,
+          "event_codes": {
+            "ROS_LOG": 2
+          },
+          "status": "REVIEW_REQUIRED",
+          "review_flags": [
+            "incomplete_or_ambiguous_analysis",
+            "no_unambiguous_command_odometry_pair"
+          ],
+          "warning_count": 3,
+          "topic_mappings": [
+            {
+              "odometry": "/rpsc4/global_position/local"
+            }
+          ]
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_24_49_0.db3",
+          "messages": 12793,
+          "topic_count": 18,
+          "event_count": 5,
+          "finding_count": 3,
+          "event_codes": {
+            "ROS_LOG": 2,
+            "ODOM_POSITION_JUMP": 3
+          },
+          "status": "REVIEW_REQUIRED",
+          "review_flags": [
+            "incomplete_or_ambiguous_analysis",
+            "no_unambiguous_command_odometry_pair"
+          ],
+          "warning_count": 3,
+          "topic_mappings": [
+            {
+              "odometry": "/rpsc4/global_position/local"
+            }
+          ]
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_30_51_0.db3",
+          "messages": 13883,
+          "topic_count": 18,
+          "event_count": 2,
+          "finding_count": 1,
+          "event_codes": {
+            "ROS_LOG": 2
+          },
+          "status": "REVIEW_REQUIRED",
+          "review_flags": [
+            "incomplete_or_ambiguous_analysis",
+            "no_unambiguous_command_odometry_pair"
+          ],
+          "warning_count": 3,
+          "topic_mappings": [
+            {
+              "odometry": "/rpsc4/global_position/local"
+            }
+          ]
+        },
+        {
+          "name": "rosbag2_2024_06_14-13_47_51_0.db3",
+          "messages": 40201,
+          "topic_count": 18,
+          "event_count": 2,
+          "finding_count": 1,
+          "event_codes": {
+            "ROS_LOG": 2
+          },
+          "status": "REVIEW_REQUIRED",
+          "review_flags": [
+            "incomplete_or_ambiguous_analysis",
+            "no_unambiguous_command_odometry_pair"
+          ],
+          "warning_count": 3,
+          "topic_mappings": [
+            {
+              "odometry": "/rpsc4/global_position/local"
+            }
+          ]
+        }
+      ]
+    },
+    "bagel_example": {
+      "url": "https://raw.githubusercontent.com/Hussain004/BAGEL/dc25e7ef395546bfbeea2ca07b71091fe70f5112/public/sample-bags/tour.mcap",
+      "success": true,
+      "files": [
+        "bagel_example.mcap"
+      ],
+      "bytes": 3939747,
+      "sha256": "1ee3a7b89700b35036f7eba33a5f7225d6a98ac313b4b9d5c106a9ffe337d1e1",
+      "bag_count": 1,
+      "bag_summaries": [
+        {
+          "name": "bagel_example.mcap",
+          "path": "bagel_example.mcap",
+          "messages": 3057,
+          "topics": 18,
+          "duration_s": 29.98,
+          "sha256": "1ee3a7b89700b35036f7eba33a5f7225d6a98ac313b4b9d5c106a9ffe337d1e1",
+          "rate_preview": [
+            {
+              "topic": "/odom",
+              "hz": 10.0
+            }
+          ]
+        }
+      ],
+      "single_analysis_return_code": 3
+    }
+  },
+  "status": "COMPLETE_WITH_LIMITATIONS",
+  "reference_truth": "Publisher-described run labels only; no independent fault onset or true negative episode annotations.",
+  "generated_reports_contain_no_raw_bag_bytes": true,
+  "vigo_command_semantic_safety": {
+    "passed": true,
+    "improper_velocity_as_command_mappings": [],
+    "note": "GPS velocity measurement must not auto-map as actuation command"
+  },
+  "experiment1_rate_regression": {
+    "verified": true,
+    "command_topic": {
+      "topic": "/mobile_base_controller/cmd_vel",
+      "type": "geometry_msgs/msg/Twist",
+      "baseline_messages": 1501,
+      "candidate_messages": 6630,
+      "baseline_mean_hz": 19.8495,
+      "candidate_mean_hz": 165.1926,
+      "baseline_peak_1s_count": 77,
+      "candidate_peak_1s_count": 495,
+      "rate_ratio": 8.3223,
+      "status": "RATE_INCREASE",
+      "reason": "Observed recorded topic rate increase vs supplied baseline; not proof of failure or attack",
+      "baseline_histogram": [
+        11,
+        10,
+        10,
+        10,
+        10,
+        6,
+        10,
+        10,
+        9,
+        10,
+        10,
+        10,
+        46,
+        8,
+        22,
+        8,
+        13,
+        10,
+        13,
+        34,
+        6,
+        10,
+        28,
+        11,
+        29,
+        8,
+        32,
+        77,
+        60,
+        26,
+        56,
+        15,
+        8,
+        22,
+        30,
+        25,
+        29,
+        10,
+        22,
+        43,
+        25,
+        42,
+        9,
+        0,
+        52,
+        10,
+        10,
+        10,
+        13,
+        77,
+        25,
+        21,
+        13,
+        26,
+        29,
+        14,
+        27,
+        28,
+        41,
+        15,
+        38,
+        26,
+        13,
+        8,
+        11,
+        10,
+        10,
+        10,
+        9,
+        8,
+        10,
+        10,
+        10,
+        10,
+        8,
+        6,
+        0
+      ],
+      "candidate_histogram": [
+        10,
+        10,
+        7,
+        10,
+        8,
+        10,
+        7,
+        8,
+        10,
+        8,
+        18,
+        20,
+        8,
+        10,
+        21,
+        22,
+        26,
+        10,
+        13,
+        10,
+        11,
+        19,
+        0,
+        0,
+        0,
+        463,
+        322,
+        495,
+        348,
+        351,
+        325,
+        474,
+        425,
+        420,
+        473,
+        460,
+        433,
+        461,
+        428,
+        417,
+        59,
+        0
+      ],
+      "histogram_scope": "first up to 240 topic-relative 1s bins, not wall-clock aligned across recordings"
+    },
+    "note": "A simulated attack was publisher-described, but only downstream bag rates were measured."
+  },
+  "vigo_reference_analysis": {
+    "bag_count": 9,
+    "compared": 8,
+    "rate_increases": 0,
+    "note": "Different driving configurations; rate differences do not imply defects"
+  },
+  "total_bags_downloaded": 12,
+  "successfully_summarized": 12
+}

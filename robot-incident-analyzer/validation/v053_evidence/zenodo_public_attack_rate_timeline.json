@@ -1,0 +1,99 @@
+{
+  "version": "0.5.2",
+  "recording": {
+    "filename": "rosbag2_2024_03_11-13_30_46_0.db3",
+    "sha256": "a0d8134f693ee8409790240fcf52e500b646feae76e70260d1e4f0a183ec4dd0",
+    "messages": 10355,
+    "duration_s": 40.1602
+  },
+  "reference": {
+    "filename": "rosbag2_2024_03_11-13_14_19_0.db3",
+    "sha256": "5830a7d1465a318d58bbc9a68823a1571370dc7681ce22652241ae6e792a1c1a"
+  },
+  "criteria": {
+    "topic": "/mobile_base_controller/cmd_vel",
+    "expected_hz": null,
+    "ratio_threshold": 3.0,
+    "min_count": 10,
+    "min_consecutive": 2
+  },
+  "topics": [
+    {
+      "topic": "/mobile_base_controller/cmd_vel",
+      "type": "geometry_msgs/msg/Twist",
+      "status": "RATE_EPISODES_FOUND",
+      "reference_mean_hz": 19.8495,
+      "baseline_method": "reference bag recorded Hz",
+      "messages": 6630,
+      "duration_s": 40.1289,
+      "window_origin_ns": 1710160246000000000,
+      "first_complete_bin_index": 1,
+      "count_by_second": [
+        8,
+        10,
+        7,
+        10,
+        8,
+        10,
+        7,
+        10,
+        8,
+        8,
+        13,
+        25,
+        8,
+        10,
+        15,
+        28,
+        10,
+        28,
+        9,
+        12,
+        10,
+        22,
+        0,
+        0,
+        0,
+        361,
+        318,
+        490,
+        376,
+        312,
+        354,
+        467,
+        444,
+        398,
+        474,
+        491,
+        419,
+        444,
+        428,
+        451,
+        127
+      ],
+      "episodes": [
+        {
+          "start_ns": 1710160271000000000,
+          "end_ns": 1710160286000000000,
+          "start_s_from_topic": 25,
+          "duration_s": 15,
+          "messages_in_windows": 6227,
+          "max_messages_per_s": 491,
+          "baseline_hz": 19.849,
+          "peak_ratio": 24.736,
+          "baseline_method": "reference bag recorded Hz",
+          "evidence": "recorded message arrival times only; not fault or attack classification"
+        }
+      ],
+      "note": "Non-detection does not mean normal. Full-recording sustained high rate cannot be detected without a reference or declared expectation."
+    }
+  ],
+  "episode_count": 1,
+  "caveats": [
+    "This detects increases in bag-recorded topic message density, NOT originating publish frequency, DoS or real robot faults.",
+    "Unobserved/dropped messages may hide true publisher rates. Different workloads can naturally change topic rates.",
+    "No rate determination is made on incomplete histogram coverage, partial edge-second bins or unmatched baselines.",
+    "Short bursts that do not persist across the minimum consecutive full windows are not labeled.",
+    "Without reference, a consistently high-frequency recording may have no local rate episode."
+  ]
+}

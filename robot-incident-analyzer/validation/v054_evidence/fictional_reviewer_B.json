@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "recording_sha256": "ee7f6fdb4b535a3a60443ab9abdf44c11c6b4531a4090d7f2dbcca071f22d3f0",
+  "topic": "/robot/cmd_vel",
+  "message_type": "geometry_msgs/msg/Twist",
+  "reviewer": "fictional_reviewer_B",
+  "ground_truth_status": "reviewed",
+  "positive_intervals": [
+    {
+      "start_ns": 1740000022000000000,
+      "end_ns": 1740000026000000000
+    }
+  ],
+  "negative_intervals": [
+    {
+      "start_ns": 1740000011000000000,
+      "end_ns": 1740000022000000000
+    },
+    {
+      "start_ns": 1740000026000000000,
+      "end_ns": 1740000029000000000
+    }
+  ],
+  "review_notes": "FICTIONAL demo. Not a human-adjudicated field label."
+}

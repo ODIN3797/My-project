@@ -1,0 +1,203 @@
+from __future__ import annotations
+import argparse
+import json
+import sys
+from pathlib import Path
+from . import __version__
+from .analysis import build_findings
+from .demo import generate_demo
+from .fixture_v2 import make_telemetry_demo
+from .inputs import collect_inputs
+from .report import save_report
+
+
+def load_config(path: Path | None) -> dict:
+    if path is None: return {}
+    cfg=json.loads(path.read_text(encoding='utf-8'))
+    if not isinstance(cfg,dict): raise ValueError('Configuration root must be an object')
+    if set(cfg)-{'topics','thresholds','schema_dirs','custom_messages','state_keys'}: raise ValueError('Configuration has unknown top-level keys')
+    if not isinstance(cfg.get('topics',{}),dict) or not isinstance(cfg.get('thresholds',{}),dict):
+        raise ValueError('topics and thresholds must be JSON objects')
+    if 'schema_dirs' in cfg:
+        if not isinstance(cfg['schema_dirs'],list) or any(not isinstance(x,str) for x in cfg['schema_dirs']):
+            raise ValueError('schema_dirs must be a JSON list of paths')
+        cfg['schema_dirs'] = [str((path.parent / x).resolve()) for x in cfg['schema_dirs']]
+    if 'custom_messages' in cfg and not isinstance(cfg['custom_messages'],dict):
+        raise ValueError('custom_messages must be a JSON object')
+    from .state_timeline import validate_state_keys
+    validate_state_keys(cfg.get('state_keys'))
+    return cfg
+
+
+def analyze_files(paths:list[Path], output:Path, config=None, max_messages=200000):
+    config=config or {}
+    from .custom_messages import SchemaRegistry, validate_custom_roles
+    registry = SchemaRegistry(config.get('schema_dirs', []))
+    custom_roles = validate_custom_roles(config.get('custom_messages', {}), registry)
+    events,stats,warnings,files,details=collect_inputs(paths,max_messages,with_details=True,
+        topic_map=config.get('topics'),thresholds=config.get('thresholds'),
+        schema_registry=registry,custom_roles=custom_roles,state_keys=config.get('state_keys'))
+    findings=build_findings(events)
+    save_report(output,events,findings,stats,warnings,files,details, state_keys=config.get('state_keys'))
+    return events,findings,stats,warnings,files,details
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser=argparse.ArgumentParser(prog='robot-incident-analyzer',
+        description='Offline ROS2 MCAP/DB3/CSV incident report generator with topic auto-discovery')
+    parser.add_argument('--version',action='version',version=f'%(prog)s {__version__}')
+    sub=parser.add_subparsers(dest='command',required=True)
+    demo=sub.add_parser('demo',help='generate fictional CSV + ROS2 MCAP examples')
+    demo.add_argument('--output',default='demo_data',type=Path)
+    studio_demo=sub.add_parser('demo-studio', help='generate fictional trajectories and multi-sensor MCAP')
+    studio_demo.add_argument('--output', default='studio_data', type=Path)
+    states_demo=sub.add_parser('demo-states',help='generate fictional docking/charging mode transitions with sensors')
+    states_demo.add_argument('--output',default='state_demo',type=Path)
+    custom_demo=sub.add_parser('demo-custom',help='generate fictional custom message MCAP example')
+    custom_demo.add_argument('--output',default='demo_custom',type=Path)
+    analyze=sub.add_parser('analyze',help='generate HTML/JSON report from inputs')
+    analyze.add_argument('inputs',nargs='+',type=Path,help='CSV/DB3/MCAP file(s) or directory')
+    analyze.add_argument('--output',default='output',type=Path)
+    analyze.add_argument('--config',type=Path,help='optional JSON topic overrides and thresholds')
+    analyze.add_argument('--max-messages',type=int,default=200000)
+    analyze.add_argument('--pdf',action='store_true',help='create offline PDF report (optional reportlab package)')
+    field=sub.add_parser('field-validate', help='offline compatibility and labelled-incident acceptance on external bags')
+    field.add_argument('inputs', nargs='+', type=Path, help='local MCAP/DB3 recordings')
+    field.add_argument('--output', default='field_results', type=Path)
+    field.add_argument('--config', type=Path)
+    field.add_argument('--labels', type=Path, help='optional human-authored CSV expected incidents')
+    field.add_argument('--origin', choices=['unknown', 'physical', 'simulation', 'synthetic'], default='unknown')
+    field.add_argument('--max-messages', type=int, default=200000)
+    comparison=sub.add_parser('compare-bags',help='reference-relative ROS2 bag topic rates and rate spikes')
+    comparison.add_argument('baseline',type=Path,help='operator-selected reference recording (not guaranteed healthy)')
+    comparison.add_argument('candidates',nargs='+',type=Path,help='one or more comparison bag files')
+    comparison.add_argument('--output',type=Path,default=Path('comparison_output'))
+    comparison.add_argument('--ratio-threshold',type=float,default=3.)
+    comparison.add_argument('--min-baseline-hz',type=float,default=2.)
+    comparison.add_argument('--min-candidate-hz',type=float,default=10.)
+    comparison.add_argument('--min-duration-s',type=float,default=3.)
+    comparison.add_argument('--max-messages',type=int,default=2000000)
+    rate=sub.add_parser('inspect-rates',help='locate sustained message-rate episodes within a ROS2 bag')
+    rate.add_argument('bag',type=Path)
+    rate.add_argument('--output',type=Path,default=Path('rate_investigation'))
+    rate.add_argument('--reference',type=Path,help='operator-selected baseline bag, topic/type must match')
+    rate.add_argument('--expected-hz',type=float,help='operator-configured expected Hz for selected topics')
+    rate.add_argument('--topic',help='exact topic (default: cmd_vel-like commands only)')
+    rate.add_argument('--ratio-threshold',type=float,default=3.)
+    rate.add_argument('--min-consecutive',type=int,default=2)
+    rate.add_argument('--min-count',type=int,default=10)
+    rate.add_argument('--max-messages',type=int,default=2000000)
+    init_labels=sub.add_parser('init-rate-labels',help='make UNREVIEWED annotation template from a rate report')
+    init_labels.add_argument('rate_report',type=Path,help='output of inspect-rates: rate_timeline.json')
+    init_labels.add_argument('--topic',required=True,help='exact topic to annotate')
+    init_labels.add_argument('--output',type=Path,default=Path('rate_annotations.json'))
+    score=sub.add_parser('score-rate-labels',help='score time-localized rate episodes against explicitly reviewed intervals')
+    score.add_argument('rate_report',type=Path,help='output of inspect-rates: rate_timeline.json')
+    score.add_argument('labels',type=Path,help='human-reviewed interval JSON, same bag SHA256')
+    score.add_argument('--output',type=Path,default=Path('rate_evaluation'))
+    reviewers=sub.add_parser('compare-reviewers',help='compare two independent reviewed-interval label files; disagreements remain unadjudicated')
+    reviewers.add_argument('rate_report',type=Path)
+    reviewers.add_argument('reviewer_a',type=Path)
+    reviewers.add_argument('reviewer_b',type=Path)
+    reviewers.add_argument('--output',type=Path,default=Path('reviewer_comparison'))
+    gui=sub.add_parser('gui',help='local-only browser UI with drag-and-drop upload')
+    gui.add_argument('--port',type=int,default=8765)
+    gui.add_argument('--output',type=Path,default=Path('output_gui'))
+    gui.add_argument('--config',type=Path)
+    gui.add_argument('--max-upload-mb',type=int,default=50)
+    args=parser.parse_args(argv)
+    try:
+        if args.command=='demo':
+            csv_path,db3_path=generate_demo(args.output)
+            mcap_path=make_telemetry_demo(args.output)
+            print(f'Fictional CSV: {csv_path}\nFictional DB3: {db3_path}\nFictional MCAP: {mcap_path}')
+            print(f'Next: python -m robot_incident_analyzer analyze {args.output} --output output')
+            return 0
+        if args.command=='demo-studio':
+            from .fixture_studio import make_studio_demo
+            path = make_studio_demo(args.output)
+            print(f'Fictional multi-sensor MCAP: {path}')
+            print(f'Next: python -m robot_incident_analyzer analyze {path} --output studio_report')
+            return 0
+        if args.command=='demo-states':
+            from .fixture_states import make_state_demo
+            bag=make_state_demo(args.output)
+            print(f'Fictional state-change recording: {bag}')
+            print(f'Next: python -m robot_incident_analyzer analyze {bag} --output state_report')
+            return 0
+        if args.command=='demo-custom':
+            from .fixture_custom import make_custom_demo
+            mcap=make_custom_demo(args.output)
+            print(f'Fictional custom MCAP: {mcap}')
+            print(f'Next: python -m robot_incident_analyzer analyze {mcap} --config examples/config_custom.json --output output_custom')
+            return 0
+        if args.command=='field-validate':
+            from .field_validation import analyze_field_cases
+            result=analyze_field_cases(args.inputs, args.output, config_file=args.config,
+                labels_file=args.labels, origin=args.origin, max_messages=args.max_messages)
+            print(f'Processed {result["recording_count"]} recording(s). Results: {args.output / "FIELD_RESULTS.md"}')
+            for item in result['cases']:
+                print(f'{item["id"]}: {item["status"]}, {item["topic_count"]} topics, {item["event_count"]} events')
+            return 3 if any(x['status']=='REVIEW_REQUIRED' for x in result['cases']) else 0
+        if args.command=='compare-bags':
+            from .bag_comparison import compare_bags
+            report=compare_bags(args.baseline,args.candidates,args.output,
+                ratio_threshold=args.ratio_threshold,min_baseline_hz=args.min_baseline_hz,
+                min_candidate_hz=args.min_candidate_hz,min_duration_s=args.min_duration_s,
+                max_messages=args.max_messages)
+            for c in report['candidate_cases']:
+                print(f"{c['candidate']['filename']}: {c['rate_increases']} topics increased, {c['rate_decreases']} topics decreased vs reference")
+            print(f'HTML: {args.output / "comparison.html"}\nJSON: {args.output / "comparison.json"}')
+            return 0
+        if args.command=='inspect-rates':
+            from .rate_timeline import inspect_bag
+            result=inspect_bag(args.bag,args.output,reference=args.reference,
+                max_messages=args.max_messages,topic=args.topic,
+                expected_hz=args.expected_hz,ratio_threshold=args.ratio_threshold,
+                min_consecutive=args.min_consecutive,min_count=args.min_count)
+            print(f"Rate episodes: {result['episode_count']} from {len(result['topics'])} selected topics")
+            print(f'HTML: {args.output / "rate_timeline.html"}\nJSON: {args.output / "rate_timeline.json"}')
+            return 0
+        if args.command=='init-rate-labels':
+            from .label_evaluation import write_template
+            t=write_template(args.rate_report,args.topic,args.output)
+            print(f'UNREVIEWED template: {args.output} (no diagnostic metrics yet)')
+            return 0
+        if args.command=='score-rate-labels':
+            from .label_evaluation import write_evaluation
+            result=write_evaluation(args.rate_report,args.labels,args.output)
+            print(f"Labelled recall: {result['positive_recall']} | False alarms/reviewed hour: {result['false_alarms_per_hour']}")
+            print(f'HTML: {args.output / "evaluation.html"}\nJSON: {args.output / "evaluation.json"}')
+            return 0
+        if args.command=='compare-reviewers':
+            from .review_agreement import write_reviewer_comparison
+            result=write_reviewer_comparison(args.rate_report,args.reviewer_a,args.reviewer_b,args.output)
+            print(f"Joint reviewed: {result['jointly_reviewed_seconds']} s; agreement: {result['agreement_fraction']}; disagreements: {result['disagreement_interval_count']}")
+            print(f'HTML: {args.output / "reviewer_comparison.html"}\nJSON: {args.output / "reviewer_comparison.json"}')
+            return 0
+        if args.command=='gui':
+            from .gui import run_gui
+            if not (1<=args.port<=65535): raise ValueError('port must be between 1 and 65535')
+            if not (1<=args.max_upload_mb<=200): raise ValueError('max-upload-mb must be within 1..200')
+            return run_gui(args.port,args.output,load_config(args.config),args.max_upload_mb)
+        if args.max_messages < 1: raise ValueError('--max-messages must be positive')
+        events,findings,stats,warnings,paths,details=analyze_files(args.inputs,args.output,load_config(args.config),args.max_messages)
+        print(f'Analyzed {len(events)} incident events and {len(stats)} ROS2 topics from {len(paths)} files.')
+        print(f'Potential findings: {len(findings)} (not confirmed root causes)')
+        for detail in details:
+            print(f'Auto discovery ({detail["source"]}): {detail["discovery"]["selected"]}')
+        if args.pdf:
+            from .pdf_export import export_pdf
+            export_pdf(args.output / "report.pdf",events,findings,stats,warnings,paths,details,state_keys=load_config(args.config).get("state_keys"))
+            print(f'PDF: {args.output / "report.pdf"}')
+        print(f'HTML: {args.output / "report.html"}\nJSON: {args.output / "report.json"}')
+        if warnings:
+            for warning in warnings: print(f'WARNING: {warning}',file=sys.stderr)
+        return 0
+    except (ValueError,OSError,ImportError,json.JSONDecodeError) as exc:
+        print(f'Error: {exc}',file=sys.stderr)
+        return 2
+
+
+if __name__=='__main__':
+    raise SystemExit(main())

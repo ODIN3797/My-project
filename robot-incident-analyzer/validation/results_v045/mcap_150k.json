@@ -1,0 +1,14 @@
+{
+  "origin": "synthetic_not_robot",
+  "python": "3.13.5",
+  "pairs": 75000,
+  "messages_generated": 150000,
+  "default_message_limit": 200000,
+  "file_mib": 59.94,
+  "analysis_seconds": 2.133,
+  "peak_rss_mib": 250.3,
+  "topic_count": 2,
+  "event_count": 0,
+  "warnings": [],
+  "partial_input": false
+}
